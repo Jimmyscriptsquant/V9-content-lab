@@ -1,34 +1,12 @@
-import { NextRequest, NextResponse } from "next/server";
-import { auth } from "@/libs/next-auth";
+import { NextRequest } from "next/server";
 import { withApiAuth, apiError, apiSuccess } from "@/libs/apiAuth";
 import connectMongo from "@/libs/mongoose";
 import ConnectedAccount from "@/models/ConnectedAccount";
 import { encrypt } from "@/libs/encryption";
 
 // GET /api/v1/accounts - List connected accounts
-export async function GET(request: NextRequest) {
+export const GET = withApiAuth(async (request, { userId }) => {
   try {
-    // Check for API key auth first
-    const authHeader = request.headers.get("Authorization");
-    
-    let userId: string;
-    
-    if (authHeader?.startsWith("Bearer v9cf_")) {
-      // API key auth
-      const authResult = await import("@/libs/apiAuth").then(m => m.authenticateApiRequest(request));
-      if (!authResult.success) {
-        return NextResponse.json({ success: false, error: authResult.error }, { status: authResult.status });
-      }
-      userId = authResult.userId!;
-    } else {
-      // Session auth
-      const session = await auth();
-      if (!session?.user?.id) {
-        return NextResponse.json({ success: false, error: "Unauthorized" }, { status: 401 });
-      }
-      userId = session.user.id;
-    }
-
     await connectMongo();
 
     const accounts = await (ConnectedAccount as any).find({ userId })
@@ -36,9 +14,8 @@ export async function GET(request: NextRequest) {
       .sort({ createdAt: -1 })
       .exec();
 
-    return NextResponse.json({
-      success: true,
-      data: accounts.map((account: any) => ({
+    return apiSuccess(
+      accounts.map((account: any) => ({
         id: account._id,
         platform: account.platform,
         platformUsername: account.platformUsername,
@@ -46,13 +23,13 @@ export async function GET(request: NextRequest) {
         status: account.status,
         lastUsedAt: account.lastUsedAt,
         createdAt: account.createdAt,
-      })),
-    });
+      }))
+    );
   } catch (error) {
     console.error("List accounts error:", error);
-    return NextResponse.json({ success: false, error: "Failed to list accounts" }, { status: 500 });
+    return apiError("Failed to list accounts", 500);
   }
-}
+}, "accounts:read");
 
 // POST /api/v1/accounts - Connect a new account (manual token entry for API users)
 export const POST = withApiAuth(async (request, { userId }) => {
@@ -113,31 +90,13 @@ export const POST = withApiAuth(async (request, { userId }) => {
 }, "accounts:write");
 
 // DELETE /api/v1/accounts - Disconnect an account
-export async function DELETE(request: NextRequest) {
+export const DELETE = withApiAuth(async (request, { userId }) => {
   try {
-    const authHeader = request.headers.get("Authorization");
-    
-    let userId: string;
-    
-    if (authHeader?.startsWith("Bearer v9cf_")) {
-      const authResult = await import("@/libs/apiAuth").then(m => m.authenticateApiRequest(request));
-      if (!authResult.success) {
-        return NextResponse.json({ success: false, error: authResult.error }, { status: authResult.status });
-      }
-      userId = authResult.userId!;
-    } else {
-      const session = await auth();
-      if (!session?.user?.id) {
-        return NextResponse.json({ success: false, error: "Unauthorized" }, { status: 401 });
-      }
-      userId = session.user.id;
-    }
-
     const { searchParams } = new URL(request.url);
     const accountId = searchParams.get("id");
 
     if (!accountId) {
-      return NextResponse.json({ success: false, error: "Account ID required" }, { status: 400 });
+      return apiError("Account ID required", 400);
     }
 
     await connectMongo();
@@ -148,15 +107,12 @@ export async function DELETE(request: NextRequest) {
     });
 
     if (!result) {
-      return NextResponse.json({ success: false, error: "Account not found" }, { status: 404 });
+      return apiError("Account not found", 404);
     }
 
-    return NextResponse.json({
-      success: true,
-      message: "Account disconnected successfully",
-    });
+    return apiSuccess({ message: "Account disconnected successfully" });
   } catch (error) {
     console.error("Disconnect account error:", error);
-    return NextResponse.json({ success: false, error: "Failed to disconnect account" }, { status: 500 });
+    return apiError("Failed to disconnect account", 500);
   }
-}
+}, "accounts:write");

@@ -1,4 +1,3 @@
-import { NextRequest, NextResponse } from "next/server";
 import { withApiAuth, apiError, apiSuccess } from "@/libs/apiAuth";
 import connectMongo from "@/libs/mongoose";
 import Content from "@/models/Content";

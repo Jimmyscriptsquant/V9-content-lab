@@ -1,5 +1,6 @@
 import { ReactNode } from "react";
 import { redirect } from "next/navigation";
+import Link from "next/link";
 import { auth } from "@/libs/next-auth";
 import config from "@/config";
 import Sidebar from "@/components/dashboard/Sidebar";
@@ -11,7 +12,49 @@ export default async function DashboardLayout({
 }: {
   children: ReactNode;
 }) {
-  const session = await auth();
+  let session: any = null;
+  try {
+    session = await auth();
+  } catch (error) {
+    console.error("Dashboard auth error:", error);
+
+    return (
+      <div className="min-h-screen bg-base-200 p-6">
+        <div className="max-w-2xl mx-auto card bg-base-100 shadow">
+          <div className="card-body">
+            <h1 className="card-title text-2xl">Auth setup required</h1>
+            <p className="text-base-content/70">
+              The dashboard requires NextAuth to be configured. Your server logs show a NextAuth
+              config error (commonly missing <code>NEXTAUTH_SECRET</code>).
+            </p>
+
+            <div className="mt-4">
+              <p className="font-semibold mb-2">Fix:</p>
+              <ol className="list-decimal list-inside space-y-1 text-sm">
+                <li>
+                  Copy <code>env.example</code> → <code>.env.local</code>
+                </li>
+                <li>
+                  Set <code>NEXTAUTH_SECRET</code> (any random string for local dev)
+                </li>
+                <li>
+                  Set auth provider env vars (e.g. <code>GOOGLE_ID</code>/<code>GOOGLE_SECRET</code>)
+                  or adjust providers
+                </li>
+                <li>Restart the dev server</li>
+              </ol>
+            </div>
+
+            <div className="mt-4 flex gap-2">
+              <Link className="btn btn-primary" href="/">
+                Back to Home
+              </Link>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   if (!session) {
     redirect(config.auth.loginUrl);

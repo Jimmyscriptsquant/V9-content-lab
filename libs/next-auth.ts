@@ -1,31 +1,74 @@
 import NextAuth from "next-auth";
 import GoogleProvider from "next-auth/providers/google";
 import EmailProvider from "next-auth/providers/email";
+import CredentialsProvider from "next-auth/providers/credentials";
 import { MongoDBAdapter } from "@auth/mongodb-adapter";
 import config from "@/config";
 import connectMongo from "./mongo";
+import connectMongoose from "./mongoose";
+import User from "@/models/User";
 
 export const authOptions = {
   // Set any random key in .env.local
-  secret: process.env.NEXTAUTH_SECRET,
+  secret:
+    process.env.NEXTAUTH_SECRET ||
+    (process.env.NODE_ENV === "development" ? "dev-secret-change-me" : undefined),
   providers: [
-    GoogleProvider({
-      // Follow the "Login with Google" tutorial to get your credentials
-      clientId: process.env.GOOGLE_ID!,
-      clientSecret: process.env.GOOGLE_SECRET!,
-      profile(profile) {
-        return {
-          id: profile.sub,
-          name: profile.given_name ? profile.given_name : profile.name,
-          email: profile.email,
-          image: profile.picture,
-          createdAt: new Date(),
-        };
-      },
-    }),
-    // Follow the "Login with Email" tutorial to set up your email server
-    // Requires a MongoDB database. Set MONOGODB_URI env variable.
-    ...(connectMongo
+    ...(process.env.GOOGLE_ID && process.env.GOOGLE_SECRET
+      ? [
+          GoogleProvider({
+            clientId: process.env.GOOGLE_ID,
+            clientSecret: process.env.GOOGLE_SECRET,
+            profile(profile) {
+              return {
+                id: profile.sub,
+                name: profile.given_name ? profile.given_name : profile.name,
+                email: profile.email,
+                image: profile.picture,
+                createdAt: new Date(),
+              };
+            },
+          }),
+        ]
+      : []),
+
+    // Dev-only credentials provider for local testing (requires MongoDB so we can create a real User _id)
+    ...(process.env.NODE_ENV === "development" && process.env.DEV_LOGIN_PASSWORD
+      ? [
+          CredentialsProvider({
+            name: "Dev Login",
+            credentials: {
+              email: { label: "Email", type: "email" },
+              password: { label: "Password", type: "password" },
+            },
+            async authorize(credentials) {
+              const email = String(credentials?.email || "").trim().toLowerCase();
+              const password = String(credentials?.password || "");
+
+              if (!email || !password) return null;
+              if (password !== process.env.DEV_LOGIN_PASSWORD) return null;
+
+              // Ensure we have a DB so app features work (content, api keys, etc.)
+              await connectMongoose();
+
+              const user = await (User as any).findOneAndUpdate(
+                { email },
+                { $setOnInsert: { email, name: email.split("@")[0] } },
+                { new: true, upsert: true }
+              );
+
+              return {
+                id: user._id.toString(),
+                email: user.email,
+                name: user.name,
+              };
+            },
+          }),
+        ]
+      : []),
+
+    // Email provider (optional; requires MongoDB + Resend)
+    ...(connectMongo && process.env.RESEND_API_KEY
       ? [
           EmailProvider({
             server: {

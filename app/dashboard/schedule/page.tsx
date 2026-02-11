@@ -17,7 +17,7 @@ interface ScheduledPost {
   content: string;
   platforms: string[];
   scheduledFor: string;
-  status: 'pending' | 'published' | 'failed';
+  status: 'scheduled' | 'published' | 'failed';
 }
 
 const platformIcons: Record<string, string> = {
@@ -47,13 +47,22 @@ export default function SchedulePage() {
       const res = await fetch('/api/v1/publish?status=scheduled');
       if (res.ok) {
         const data = await res.json();
-        setPosts(data.data || []);
+        if (data.success) {
+          const items = (data.data || []).map((p: any) => ({
+            id: p.id,
+            content: p.publishedContent?.text || '',
+            platforms: [p.platform],
+            scheduledFor: p.scheduledFor,
+            status: p.status,
+          }));
+          setPosts(items);
+        }
       }
     } catch (error) {
       // Mock data
       setPosts([
-        { id: '1', content: 'Excited to announce our new feature!', platforms: ['twitter', 'linkedin'], scheduledFor: new Date(Date.now() + 86400000).toISOString(), status: 'pending' },
-        { id: '2', content: 'Behind the scenes look at our process', platforms: ['instagram'], scheduledFor: new Date(Date.now() + 172800000).toISOString(), status: 'pending' },
+        { id: '1', content: 'Excited to announce our new feature!', platforms: ['twitter'], scheduledFor: new Date(Date.now() + 86400000).toISOString(), status: 'scheduled' },
+        { id: '2', content: 'Behind the scenes look at our process', platforms: ['instagram'], scheduledFor: new Date(Date.now() + 172800000).toISOString(), status: 'scheduled' },
       ]);
     } finally {
       setIsLoading(false);

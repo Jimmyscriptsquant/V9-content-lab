@@ -33,7 +33,7 @@ cd v9-content-lab
 npm install
 
 # Configure environment
-cp .env.example .env.local
+cp env.example .env.local
 # Edit .env.local with your API keys
 
 # Run development server

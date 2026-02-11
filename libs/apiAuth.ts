@@ -3,15 +3,31 @@ import { hashApiKey } from "./encryption";
 import connectMongo from "./mongoose";
 import ApiKey from "@/models/ApiKey";
 import User from "@/models/User";
-// Note: For session auth in API routes, use auth() from @/libs/next-auth
+import { auth as getSession } from "@/libs/next-auth";
 
 export interface ApiAuthResult {
   success: boolean;
   userId?: string;
-  user?: any;
-  apiKey?: any;
+  user?: unknown;
+  apiKey?: unknown;
+  authType?: "api_key" | "session";
   error?: string;
   status?: number;
+}
+
+function getApiKeyFromRequest(request: NextRequest): string | null {
+  const authHeader = request.headers.get("Authorization");
+  if (authHeader) {
+    const parts = authHeader.split(" ");
+    if (parts.length === 2 && parts[0] === "Bearer") {
+      return parts[1];
+    }
+  }
+
+  const headerKey = request.headers.get("X-API-Key");
+  if (headerKey) return headerKey;
+
+  return null;
 }
 
 /**
@@ -20,28 +36,14 @@ export interface ApiAuthResult {
 export async function authenticateApiRequest(
   request: NextRequest
 ): Promise<ApiAuthResult> {
-  // Get Authorization header
-  const authHeader = request.headers.get("Authorization");
-  
-  if (!authHeader) {
+  const apiKeyValue = getApiKeyFromRequest(request);
+  if (!apiKeyValue) {
     return {
       success: false,
-      error: "Missing Authorization header",
+      error: "Missing API key (use Authorization: Bearer <key> or X-API-Key: <key>)",
       status: 401,
     };
   }
-  
-  // Parse Bearer token
-  const parts = authHeader.split(" ");
-  if (parts.length !== 2 || parts[0] !== "Bearer") {
-    return {
-      success: false,
-      error: "Invalid Authorization header format. Use: Bearer <api_key>",
-      status: 401,
-    };
-  }
-  
-  const apiKeyValue = parts[1];
   
   // Validate key format
   if (!apiKeyValue.startsWith("v9cf_")) {
@@ -99,9 +101,65 @@ export async function authenticateApiRequest(
       userId: user._id.toString(),
       user,
       apiKey,
+      authType: "api_key",
     };
   } catch (error) {
     console.error("API auth error:", error);
+    return {
+      success: false,
+      error: "Authentication failed",
+      status: 500,
+    };
+  }
+}
+
+/**
+ * Authenticate using API key if present, otherwise fall back to NextAuth session.
+ * This enables Dashboard (session) and external clients (API keys) to hit the same endpoints.
+ */
+export async function authenticateRequest(
+  request: NextRequest
+): Promise<ApiAuthResult> {
+  const apiKeyValue = getApiKeyFromRequest(request);
+  if (apiKeyValue) {
+    return authenticateApiRequest(request);
+  }
+
+  let session: any;
+  try {
+    session = await getSession();
+  } catch (error) {
+    console.error("NextAuth session error:", error);
+    return {
+      success: false,
+      error:
+        "Auth is not configured. Set NEXTAUTH_SECRET (and provider env vars) in .env.local, then restart the dev server.",
+      status: 500,
+    };
+  }
+  const sessionUserId = session?.user?.id;
+
+  if (!sessionUserId) {
+    return {
+      success: false,
+      error: "Unauthorized",
+      status: 401,
+    };
+  }
+
+  // Optional: load a user doc so handler has consistent data
+  try {
+    await connectMongo();
+    const user = await (User as any).findById(sessionUserId);
+    return {
+      success: true,
+      userId: sessionUserId,
+      user,
+      apiKey: null,
+      authType: "session",
+    };
+  } catch (error) {
+    console.error("Session auth error:", error);
     return {
       success: false,
       error: "Authentication failed",
@@ -154,13 +212,14 @@ export function withApiAuth(
   requiredScope?: string
 ) {
   return async (request: NextRequest): Promise<NextResponse> => {
-    const auth = await authenticateApiRequest(request);
+    const auth = await authenticateRequest(request);
     
     if (!auth.success) {
       return apiError(auth.error!, auth.status);
     }
     
-    if (requiredScope && !hasScope(auth.apiKey, requiredScope)) {
+    // Scope checks only apply to API-key auth; Dashboard session auth is trusted.
+    if (requiredScope && auth.authType === "api_key" && !hasScope(auth.apiKey, requiredScope)) {
       return apiError(`Missing required scope: ${requiredScope}`, 403);
     }
     

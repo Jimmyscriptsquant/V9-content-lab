@@ -1,7 +1,7 @@
 import mongoose from "mongoose";
 import toJSON from "./plugins/toJSON";
 
-export type ContentType = "text" | "image" | "video" | "reel" | "carousel";
+export type ContentType = "text" | "image" | "video" | "voice" | "reel" | "carousel";
 export type ContentStatus = "draft" | "ready" | "published" | "failed" | "archived";
 
 const contentSchema = new mongoose.Schema(
@@ -14,7 +14,7 @@ const contentSchema = new mongoose.Schema(
     // Content type
     type: {
       type: String,
-      enum: ["text", "image", "video", "reel", "carousel"],
+      enum: ["text", "image", "video", "voice", "reel", "carousel"],
       required: true,
     },
     // Content status

@@ -1,15 +1,16 @@
-// @ts-nocheck
-import { NextRequest, NextResponse } from "next/server";
 import { withApiAuth, apiError, apiSuccess } from "@/libs/apiAuth";
 import connectMongo from "@/libs/mongoose";
 import Content from "@/models/Content";
 import * as crypto from "crypto";
 
 // Kling AI configuration
-const KLING_API_KEY = process.env.KLING_API_KEY || "AF4peKCp8PEnRaQfbtY9ebap83hafJkH";
-const KLING_API_SECRET = process.env.KLING_API_SECRET || "PaPMrLtDtgY3MtC8afgE4aEpKhtGANHN";
+const KLING_API_KEY = process.env.KLING_API_KEY;
+const KLING_API_SECRET = process.env.KLING_API_SECRET;
 
 function createKlingJWT(): string {
+  if (!KLING_API_KEY || !KLING_API_SECRET) {
+    throw new Error("Kling AI is not configured (missing KLING_API_KEY / KLING_API_SECRET)");
+  }
   const header = { alg: "HS256", typ: "JWT" };
   const now = Math.floor(Date.now() / 1000);
   const payload = { iss: KLING_API_KEY, exp: now + 1800, nbf: now - 5 };
@@ -184,7 +185,19 @@ async function generateImage(prompt: string, options?: any) {
 
 // Video generation with Kling AI
 async function generateVideo(prompt: string, options?: any) {
-  const scenes = options?.scenes || [{ prompt, duration: "5" }];
+  if (!KLING_API_KEY || !KLING_API_SECRET) {
+    return {
+      scenes: [],
+      status: "failed",
+      error: "Video generation is not configured (missing Kling credentials)",
+    };
+  }
+
+  const rawScenes = Array.isArray(options?.scenes) ? options.scenes : [{ prompt, duration: 5 }];
+  const scenes = rawScenes.map((s: any) => ({
+    prompt: String(s.prompt || prompt),
+    duration: String(typeof s.duration === "number" ? s.duration : (s.duration || "5")),
+  }));
   const aspectRatio = options?.aspectRatio || "9:16";
   
   const jwt = createKlingJWT();
@@ -238,7 +251,14 @@ async function generateVideo(prompt: string, options?: any) {
 }
 
 // Voice generation
-async function generateVoice(text: string, options?: any) {
+interface VoiceGenerationResult {
+  url: string | null;
+  status: "ready" | "failed";
+  duration?: number;
+  error?: string;
+}
+
+async function generateVoice(text: string, options?: any): Promise<VoiceGenerationResult> {
   const openaiKey = process.env.OPENAI_API_KEY;
   
   if (!openaiKey) {
@@ -283,6 +303,9 @@ export const GET = withApiAuth(async (request, { userId }) => {
   const contentId = searchParams.get("contentId");
 
   if (taskId) {
+    if (!KLING_API_KEY || !KLING_API_SECRET) {
+      return apiError("Video status is not configured (missing Kling credentials)", 500);
+    }
     const jwt = createKlingJWT();
     const response = await fetch(`https://api.klingai.com/v1/videos/text2video/${taskId}`, {
       headers: { "Authorization": `Bearer ${jwt}` },

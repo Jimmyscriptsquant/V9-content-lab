@@ -32,7 +32,15 @@ const apiKeySchema = new mongoose.Schema(
     // Permissions/scopes
     scopes: {
       type: [String],
-      default: ["content:read", "content:write", "publish:write", "analytics:read"],
+      default: [
+        "content:read",
+        "content:write",
+        "publish:read",
+        "publish:write",
+        "accounts:read",
+        "accounts:write",
+        "analytics:read",
+      ],
     },
     // Rate limiting
     rateLimit: {

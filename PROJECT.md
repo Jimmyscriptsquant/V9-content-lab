@@ -17,18 +17,19 @@
 4. [Core Features](#core-features)
 5. [Architecture Overview](#architecture-overview)
 6. [Tech Stack](#tech-stack)
-7. [Database Schema](#database-schema)
-8. [API Design](#api-design)
-9. [Authentication & Security](#authentication--security)
-10. [AI Integration](#ai-integration)
-11. [Social Platform Integration](#social-platform-integration)
-12. [Dashboard Features](#dashboard-features)
-13. [Pricing & Plans](#pricing--plans)
-14. [Development Workflow](#development-workflow)
-15. [Environment Setup](#environment-setup)
-16. [Deployment](#deployment)
-17. [Roadmap](#roadmap)
-18. [Team Responsibilities](#team-responsibilities)
+7. [UI/UX & Design System](#uiux--design-system)
+8. [Database Schema](#database-schema)
+9. [API Design](#api-design)
+10. [Authentication & Security](#authentication--security)
+11. [AI Integration](#ai-integration)
+12. [Social Platform Integration](#social-platform-integration)
+13. [Dashboard Features](#dashboard-features)
+14. [Pricing & Plans](#pricing--plans)
+15. [Development Workflow](#development-workflow)
+16. [Environment Setup](#environment-setup)
+17. [Deployment](#deployment)
+18. [Roadmap](#roadmap)
+19. [Team Responsibilities](#team-responsibilities)
 
 ---
 
@@ -323,6 +324,45 @@ User Request: "Generate a tweet about AI and publish to X"
 
 ---
 
+## UI/UX & Design System
+
+### Visual Style Direction (Recommended)
+
+- **Product vibe**: Modern “creator tools” UI — clean, fast, high-contrast, minimal friction.
+- **Design system**: DaisyUI components + Tailwind utilities, with a single global theme.
+- **Theme choice** (pick one and standardize across the app):
+  - **Primary recommendation**: DaisyUI `business` (neutral, SaaS-friendly, crisp)
+  - **Alternative (more creator/consumer)**: DaisyUI `cupcake` or `retro` (if we want “fun”)
+  - **Alternative (dark-first)**: DaisyUI `night` (strong contrast, dev-friendly)
+
+### UX Principles (Non-Negotiables)
+
+- **Speed**: Every action has an immediate state change (loading, optimistic UI where safe).
+- **Clarity**: All generation/publish flows show what will happen next (draft → scheduled → published).
+- **Safety**: Publishing is always previewable; destructive actions require confirmation.
+- **Automation-friendly**: Every UI workflow has an equivalent API workflow (documented).
+
+### Layout & Navigation
+
+- **Dashboard shell**: Left sidebar nav + top bar (search, usage, account menu).
+- **Primary CTAs**: One per screen; secondary actions de-emphasized.
+- **Empty states**: Always include a “Next best action” (connect account / create content / create API key).
+
+### Component Standards (DaisyUI)
+
+- **Buttons**: `btn`, `btn-primary`, `btn-ghost`; loading uses `loading loading-spinner`.
+- **Cards**: `card bg-base-100` with `card-body`; keep density consistent.
+- **Forms**: `form-control`, `label`, `input`, `select`, `textarea`; inline validation copy.
+- **Tables**: `table` with sticky header for long lists (content, posts, api keys).
+
+### Accessibility & Content Guidelines
+
+- **Contrast**: meet WCAG AA for text and controls in the chosen theme.
+- **Keyboard**: modals, dropdowns, and tables must be fully navigable.
+- **Copy**: short labels, clear errors, always show plan/limit messages in human terms.
+
+---
+
 ## Database Schema
 
 ### Users Collection
@@ -374,7 +414,7 @@ interface ApiKey {
   name: string;
   keyHash: string;           // SHA-256 hash of the key
   keyPreview: string;        // First 8 chars for display
-  scopes: string[];          // ['generate', 'publish', 'read']
+  scopes: string[];          // e.g. ['content:read', 'content:write', 'publish:write']
   
   isActive: boolean;
   expiresAt?: Date;
@@ -556,6 +596,34 @@ Or via header:
 X-API-Key: v9cf_your_api_key_here
 ```
 
+### API Key Lifecycle (Dashboard + External Automation)
+
+API keys are how customers (and tools like **OpenClaw**) operate V9 Content Lab externally.
+
+- **Create**: In the Dashboard → **API Keys** page (`/dashboard/api-keys`), create a key with a name and scopes.
+- **One-time reveal**: The full secret is shown **once**. After that, only the preview is visible.
+- **Storage**: We store only a **SHA-256 hash** (`keyHash`) + `keyPreview` for identification.
+- **Rotation**: Customers should rotate keys regularly; the platform should support multiple active keys per user.
+- **Revocation**: Keys can be revoked immediately; revoked keys must fail auth with a clear error code.
+- **Least privilege**: Scopes must be enforced server-side (e.g. `content:read`, `content:write`, `publish:write`, `accounts:read`).
+- **Expiration**: Optional `expiresAt` can be set for temporary automation keys.
+
+### External Clients (OpenClaw, n8n, Zapier, Make, Custom Scripts)
+
+- **What customers need**:
+  - **Base URL**: `https://api.contentlab.velocitynine-labs.com/v1`
+  - **API Key**: `v9cf_...` (keep in a secret manager / environment variable)
+  - **Header**: `Authorization: Bearer <key>` or `X-API-Key: <key>`
+
+Example request (generate text):
+
+```bash
+curl -X POST "https://api.contentlab.velocitynine-labs.com/v1/generate" \
+  -H "Authorization: Bearer v9cf_your_api_key_here" \
+  -H "Content-Type: application/json" \
+  -d '{"type":"text","prompt":"Write a tweet about AI automation","options":{"template":"tweet","tone":"professional","variations":2}}'
+```
+
 ### Response Format
 
 All responses follow this structure:
@@ -593,34 +661,34 @@ Error responses:
 #### API Keys
 
 ```http
-GET    /v1/keys              # List all API keys
-POST   /v1/keys              # Create new API key
-DELETE /v1/keys?id={id}      # Revoke API key
+GET    /keys                 # List all API keys
+POST   /keys                 # Create new API key
+DELETE /keys?id={id}         # Revoke API key
 ```
 
 #### Connected Accounts
 
 ```http
-GET    /v1/accounts          # List connected accounts
-POST   /v1/accounts          # Start OAuth flow
-DELETE /v1/accounts?id={id}  # Disconnect account
+GET    /accounts             # List connected accounts
+POST   /accounts             # Start OAuth flow
+DELETE /accounts?id={id}     # Disconnect account
 ```
 
 #### Content
 
 ```http
-GET    /v1/content           # List content (paginated)
-GET    /v1/content/{id}      # Get single content
-POST   /v1/content           # Create content manually
-PUT    /v1/content/{id}      # Update content
-DELETE /v1/content/{id}      # Delete content
+GET    /content              # List content (paginated)
+GET    /content/{id}         # Get single content
+POST   /content              # Create content manually
+PUT    /content/{id}         # Update content
+DELETE /content/{id}         # Delete content
 ```
 
 #### Generate
 
 ```http
-POST   /v1/generate          # Generate content
-GET    /v1/generate/{id}     # Get generation status (async)
+POST   /generate             # Generate content
+GET    /generate/{id}        # Get generation status (async)
 ```
 
 **Generate Request:**
@@ -668,10 +736,10 @@ GET    /v1/generate/{id}     # Get generation status (async)
 #### Publish
 
 ```http
-POST   /v1/publish           # Publish or schedule post
-GET    /v1/publish           # List posts (paginated)
-GET    /v1/publish/{id}      # Get post status
-DELETE /v1/publish/{id}      # Cancel scheduled post
+POST   /publish              # Publish or schedule post
+GET    /publish              # List posts (paginated)
+GET    /publish/{id}         # Get post status
+DELETE /publish/{id}         # Cancel scheduled post
 ```
 
 **Publish Request:**
@@ -771,7 +839,7 @@ Webhook events are sent to configured URLs:
    - Prefixed with `v9cf_` for identification
    - SHA-256 hashed before storage
    - Never stored in plain text
-   - Scoped permissions (generate, publish, read)
+   - Scoped permissions (e.g. `content:read`, `content:write`, `publish:read`, `publish:write`, `accounts:*`)
 
 2. **Rate Limiting**:
    - Per-key limits

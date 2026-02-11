@@ -1,5 +1,3 @@
-// @ts-nocheck
-import { NextRequest, NextResponse } from "next/server";
 import { withApiAuth, apiError, apiSuccess } from "@/libs/apiAuth";
 import connectMongo from "@/libs/mongoose";
 import Content from "@/models/Content";
@@ -11,106 +9,134 @@ import { decrypt } from "@/libs/encryption";
 export const POST = withApiAuth(async (request, { userId, apiKey }) => {
   try {
     const body = await request.json();
-    const { contentId, platform, accountId, text, mediaUrls, scheduledFor, hashtags } = body;
+    const { contentId, platform, platforms, accountId, text, mediaUrls, scheduledFor, hashtags } = body;
 
-    if (!platform) {
-      return apiError("Missing required field: platform");
+    const targetPlatforms: string[] = Array.isArray(platforms) && platforms.length > 0
+      ? platforms
+      : (platform ? [platform] : []);
+
+    if (targetPlatforms.length === 0) {
+      return apiError("Missing required field: platform (string) or platforms (string[])");
     }
 
     await connectMongo();
 
-    // Get connected account
-    let connectedAccount;
-    if (accountId) {
-      connectedAccount = await (ConnectedAccount as any).findOne({
-        _id: accountId,
-        userId,
-        platform,
-        status: "active",
-      });
-    } else {
-      // Find first active account for the platform
-      connectedAccount = await (ConnectedAccount as any).findOne({
-        userId,
-        platform,
-        status: "active",
-      });
-    }
-
-    if (!connectedAccount) {
-      return apiError(`No active ${platform} account connected`, 400);
-    }
-
     // Get or create content
-    let content;
+    let content: any = null;
     if (contentId) {
-      content = await Content.findOne({ _id: contentId, userId });
+      content = await (Content as any).findOne({ _id: contentId, userId });
       if (!content) {
         return apiError("Content not found", 404);
       }
-    }
+    } else if (text || (Array.isArray(mediaUrls) && mediaUrls.length > 0)) {
+      // Create a content record so Post.contentId is always valid (required by schema)
+      const media = Array.isArray(mediaUrls)
+        ? mediaUrls.map((url: string) => ({
+            type: "image",
+            url,
+          }))
+        : [];
 
-    // Create post record
-    const post = await (Post as any).create({
-      userId,
-      contentId: content?._id,
-      connectedAccountId: connectedAccount._id,
-      platform,
-      status: scheduledFor ? "scheduled" : "publishing",
-      scheduledFor: scheduledFor ? new Date(scheduledFor) : null,
-      publishedContent: {
-        text: text || content?.text,
-        mediaUrls: mediaUrls || content?.media?.map((m: any) => m.url) || [],
-        hashtags: hashtags || [],
-      },
-      apiRequest: {
-        apiKeyId: apiKey._id,
-        requestId: `req_${Date.now()}`,
-      },
-    });
-
-    // If scheduled, return early
-    if (scheduledFor) {
-      return apiSuccess({
-        postId: post._id,
-        status: "scheduled",
-        scheduledFor: post.scheduledFor,
-        platform,
+      content = await (Content as any).create({
+        userId,
+        type: "text",
+        status: "ready",
+        title: "Published via Dashboard/API",
+        text: text || "",
+        media,
+        tags: [],
+        folder: "Uncategorized",
       });
-    }
-
-    // Publish immediately
-    const result = await publishToPlatform(connectedAccount, post);
-
-    // Update post with result
-    if (result.success) {
-      post.status = "published";
-      post.publishedAt = new Date();
-      post.platformPostId = result.platformPostId;
-      post.platformPostUrl = result.platformPostUrl;
     } else {
-      post.status = "failed";
-      post.error = {
-        message: result.error,
-        occurredAt: new Date(),
-      };
+      return apiError("Provide contentId or text/mediaUrls to publish");
     }
-    await post.save();
 
-    // Update content status if linked
-    if (content) {
-      content.status = result.success ? "published" : "failed";
+    const requestId = `req_${Date.now()}`;
+
+    const results = await Promise.all(
+      targetPlatforms.map(async (p) => {
+        // Get connected account for this platform
+        const connectedAccount = accountId
+          ? await (ConnectedAccount as any).findOne({ _id: accountId, userId, platform: p, status: "active" })
+          : await (ConnectedAccount as any).findOne({ userId, platform: p, status: "active" });
+
+        if (!connectedAccount) {
+          return {
+            platform: p,
+            success: false,
+            status: "failed",
+            error: `No active ${p} account connected`,
+          };
+        }
+
+        // Create post record (one per platform)
+        const post = await (Post as any).create({
+          userId,
+          contentId: content._id,
+          connectedAccountId: connectedAccount._id,
+          platform: p,
+          status: scheduledFor ? "scheduled" : "publishing",
+          scheduledFor: scheduledFor ? new Date(scheduledFor) : null,
+          publishedContent: {
+            text: text || content?.text,
+            mediaUrls: (Array.isArray(mediaUrls) ? mediaUrls : null) || content?.media?.map((m: any) => m.url) || [],
+            hashtags: Array.isArray(hashtags) ? hashtags : [],
+          },
+          apiRequest: {
+            apiKeyId: apiKey?._id,
+            requestId,
+          },
+        });
+
+        // If scheduled, return early
+        if (scheduledFor) {
+          return {
+            platform: p,
+            success: true,
+            postId: post._id,
+            status: "scheduled",
+            scheduledFor: post.scheduledFor,
+          };
+        }
+
+        // Publish immediately
+        const result = await publishToPlatform(connectedAccount, post);
+
+        // Update post with result
+        if (result.success) {
+          post.status = "published";
+          post.publishedAt = new Date();
+          post.platformPostId = result.platformPostId;
+          post.platformPostUrl = result.platformPostUrl;
+        } else {
+          post.status = "failed";
+          post.error = {
+            message: result.error,
+            occurredAt: new Date(),
+          };
+        }
+        await post.save();
+
+        return {
+          platform: p,
+          success: result.success,
+          postId: post._id,
+          status: post.status,
+          platformPostId: post.platformPostId,
+          platformPostUrl: post.platformPostUrl,
+          error: post.error?.message,
+        };
+      })
+    );
+
+    // Update content status if we published immediately to at least one platform
+    if (!scheduledFor) {
+      const anySuccess = results.some((r) => r.success);
+      content.status = anySuccess ? "published" : "failed";
       await content.save();
     }
 
-    return apiSuccess({
-      postId: post._id,
-      status: post.status,
-      platform,
-      platformPostId: post.platformPostId,
-      platformPostUrl: post.platformPostUrl,
-      error: post.error?.message,
-    });
+    return apiSuccess({ results });
 
   } catch (error) {
     console.error("Publish error:", error);
@@ -126,6 +152,9 @@ async function publishToPlatform(
   
   // Decrypt tokens
   const tokens = decryptTokens(account);
+  if (!tokens) {
+    return { success: false, error: "Connected account tokens could not be decrypted" };
+  }
   
   switch (account.platform) {
     case "twitter":
@@ -367,11 +396,15 @@ function formatForPlatform(text: string, platform: string, hashtags: string[]): 
 export const GET = withApiAuth(async (request, { userId }) => {
   const { searchParams } = new URL(request.url);
   const postId = searchParams.get("postId");
+  const status = searchParams.get("status");
   
   if (!postId) {
     // List recent posts
     await connectMongo();
-    const posts = await (Post as any).find({ userId })
+    const query: any = { userId };
+    if (status) query.status = status;
+
+    const posts = await (Post as any).find(query)
       .sort({ createdAt: -1 })
       .limit(50)
       .populate("connectedAccountId", "platform platformUsername");
