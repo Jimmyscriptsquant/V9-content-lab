@@ -15,8 +15,21 @@ import {
 } from "lucide-react";
 
 export default async function DashboardPage() {
-  const session = await auth();
-  
+  // DEV BYPASS: skip auth when SKIP_AUTH=1 in development
+  const skipAuth = process.env.NODE_ENV === "development" && process.env.SKIP_AUTH === "1";
+
+  let session: any = skipAuth
+    ? {
+        user: {
+          id: "000000000000000000000001",
+          name: "Dev User",
+          email: "admin@velocitynine-labs.com",
+          image: null,
+        },
+        expires: new Date(Date.now() + 86400000).toISOString(),
+      }
+    : await auth();
+
   if (!session) {
     redirect(config.auth.loginUrl);
   }

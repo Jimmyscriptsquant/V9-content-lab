@@ -91,7 +91,10 @@ export default function CreatePage() {
   const [template, setTemplate] = useState('tweet');
   const [tone, setTone] = useState('professional');
   const [isGenerating, setIsGenerating] = useState(false);
-  const [generated, setGenerated] = useState<any>(null);
+  const [generatedText, setGeneratedText] = useState<string | null>(null);
+  const [generatedImageUrl, setGeneratedImageUrl] = useState<string | null>(null);
+  const [latestContentId, setLatestContentId] = useState<string | null>(null);
+  const [reelResult, setReelResult] = useState<any>(null);
   const [copied, setCopied] = useState(false);
   const [previewPlatform, setPreviewPlatform] = useState<PreviewPlatform>('instagram');
 
@@ -105,7 +108,6 @@ export default function CreatePage() {
   const [reelDuration, setReelDuration] = useState<15 | 30>(30);
   const [planLoading, setPlanLoading] = useState(false);
   const [reelPlan, setReelPlan] = useState<{ title: string; hook: string; scenes: ReelScene[] } | null>(null);
-  const [reelContentId, setReelContentId] = useState<string | null>(null);
   const [reelGenerating, setReelGenerating] = useState(false);
   const [selectedVideoModel, setSelectedVideoModel] = useState('kling-v1');
   const [globalVoice, setGlobalVoice] = useState('alloy');
@@ -139,6 +141,7 @@ export default function CreatePage() {
   }, [reelPlan]);
 
   const activeScene = reelPlan?.scenes?.[activeSceneIdx] || null;
+  const hasContent = !!(generatedText || generatedImageUrl);
 
   /* ───── Media upload ───── */
   const handleUploadMedia = useCallback(async (files: FileList | null) => {
@@ -214,7 +217,6 @@ export default function CreatePage() {
   const handleGenerate = async () => {
     if (!prompt.trim()) return;
     setIsGenerating(true);
-    setGenerated(null);
     try {
       const res = await fetch('/api/v1/generate', {
         method: 'POST',
@@ -223,12 +225,17 @@ export default function CreatePage() {
       });
       const data = await res.json();
       if (data.success) {
-        setGenerated({ ...data.data, type: activeType });
+        if (activeType === 'text') {
+          setGeneratedText(data.data.text || `Generated content for: ${prompt}`);
+        } else if (activeType === 'image') {
+          setGeneratedImageUrl(data.data.url);
+        }
+        if (data.data.contentId) setLatestContentId(data.data.contentId);
       } else {
-        setGenerated({ type: activeType, text: `Generated content for: ${prompt}` });
+        if (activeType === 'text') setGeneratedText(`Generated content for: ${prompt}`);
       }
     } catch {
-      setGenerated({ type: activeType, text: `Generated content for: ${prompt}` });
+      if (activeType === 'text') setGeneratedText(`Generated content for: ${prompt}`);
     } finally { setIsGenerating(false); }
   };
 
@@ -236,7 +243,6 @@ export default function CreatePage() {
     if (!prompt.trim()) return;
     setPlanLoading(true);
     setReelPlan(null);
-    setReelContentId(null);
     try {
       const res = await fetch('/api/v1/reels/plan', {
         method: 'POST',
@@ -248,7 +254,6 @@ export default function CreatePage() {
         const plan = data.data.plan;
         plan.scenes = (plan.scenes || []).map((s: any) => ({ ...s, voice: globalVoice }));
         setReelPlan(plan);
-        setReelContentId(data.data.contentId);
         setActiveSceneIdx(0);
       } else {
         alert(data?.error || 'Failed to plan storyboard');
@@ -276,7 +281,8 @@ export default function CreatePage() {
       });
       const data = await res.json();
       if (res.ok && data.success) {
-        setGenerated({ ...data.data, type: 'reel' });
+        setReelResult({ ...data.data, type: 'reel' });
+        if (data.data.contentId) setLatestContentId(data.data.contentId);
       } else { alert(data?.error || 'Reel generation failed'); }
     } catch { alert('Reel generation failed'); }
     finally { setReelGenerating(false); }
@@ -293,7 +299,7 @@ export default function CreatePage() {
   };
 
   const handleCopy = () => {
-    const text = generated?.text || generated?.url;
+    const text = generatedText || generatedImageUrl || reelResult?.text;
     if (text) { navigator.clipboard.writeText(text); setCopied(true); setTimeout(() => setCopied(false), 2000); }
   };
 
@@ -307,6 +313,49 @@ export default function CreatePage() {
       else setPreviewPlatform('facebook');
     }
   }, [activeType, template]);
+
+  /* ───── Poll Kling video tasks ───── */
+  useEffect(() => {
+    if (!reelResult?.scenes?.length) return;
+    const processing = reelResult.scenes.filter((s: any) => s.status === 'processing');
+    if (processing.length === 0) return;
+
+    const interval = setInterval(async () => {
+      let updated = false;
+      const newScenes = reelResult.scenes.map((s: any) => ({ ...s }));
+
+      for (const scene of newScenes) {
+        if (scene.status !== 'processing' || !scene.taskId) continue;
+        try {
+          const res = await fetch(`/api/v1/generate?taskId=${scene.taskId}`);
+          const data = await res.json();
+          if (data.success && data.data) {
+            if (data.data.status === 'succeed') {
+              scene.status = 'complete';
+              scene.videoUrl = data.data.videoUrl;
+              updated = true;
+            } else if (data.data.status === 'failed') {
+              scene.status = 'failed';
+              updated = true;
+            }
+          }
+        } catch (e) {
+          console.error('Poll error:', e);
+        }
+      }
+
+      if (updated) {
+        const allDone = newScenes.every((s: any) => s.status !== 'processing');
+        setReelResult((prev: any) => ({
+          ...prev,
+          scenes: newScenes,
+          status: allDone ? 'ready' : 'processing',
+        }));
+      }
+    }, 5000);
+
+    return () => clearInterval(interval);
+  }, [reelResult]);
 
   /* ───────── Render ───────── */
   return (
@@ -349,14 +398,14 @@ export default function CreatePage() {
 
         {/* Quick actions */}
         <div className="flex gap-2">
-          {generated && (
+          {(hasContent || reelResult) && (
             <>
               <button onClick={handleCopy} className="btn btn-ghost btn-sm gap-1">
                 {copied ? <Check size={14} /> : <Copy size={14} />}
                 {copied ? 'Copied' : 'Copy'}
               </button>
               <Link
-                href={generated?.contentId ? `/dashboard/publish?contentId=${generated.contentId}` : '/dashboard/publish'}
+                href={latestContentId ? `/dashboard/publish?contentId=${latestContentId}` : '/dashboard/publish'}
                 className="btn btn-primary btn-sm gap-1"
               >
                 <Send size={14} /> Publish
@@ -593,7 +642,7 @@ export default function CreatePage() {
                     </button>
                     <button
                       className="btn btn-outline btn-sm"
-                      onClick={() => { setReelPlan(null); setReelContentId(null); setGenerated(null); }}
+                      onClick={() => { setReelPlan(null); setReelResult(null); }}
                     >
                       Reset
                     </button>
@@ -834,30 +883,51 @@ export default function CreatePage() {
               )}
             </div>
 
-            {/* Preview section at bottom of right panel */}
-            {generated && (
+            {/* Reel generation status */}
+            {reelResult && (
               <div className="border-t border-base-300 p-4">
                 <div className="flex items-center justify-between mb-2">
-                  <h3 className="text-sm font-semibold flex items-center gap-1.5"><Eye size={14} /> Preview</h3>
-                  <div className="flex gap-1">
-                    {(['twitter', 'instagram', 'tiktok', 'facebook', 'linkedin'] as const).map((p) => (
-                      <button
-                        key={p}
-                        onClick={() => setPreviewPlatform(p)}
-                        className={`btn btn-xs ${previewPlatform === p ? 'btn-primary' : 'btn-ghost'}`}
-                      >
-                        {p === 'twitter' ? '𝕏' : p === 'instagram' ? 'IG' : p === 'facebook' ? 'f' : p === 'linkedin' ? 'in' : 'TT'}
-                      </button>
-                    ))}
+                  <h3 className="text-sm font-semibold flex items-center gap-1.5"><Eye size={14} /> Reel Status</h3>
+                  <div className={`badge badge-sm ${reelResult.status === 'ready' ? 'badge-success' : reelResult.status === 'failed' ? 'badge-error' : 'badge-warning'}`}>
+                    {reelResult.status}
                   </div>
                 </div>
-                <SocialPostPreview
-                  platform={previewPlatform}
-                  brandName={brandKit?.brandName || 'Your Brand'}
-                  handle="@yourbrand"
-                  text={generated?.text || ''}
-                  imageUrl={generated?.url || null}
-                />
+                <div className="space-y-2">
+                  {(reelResult.scenes || []).map((scene: any, idx: number) => (
+                    <div key={idx} className="flex items-center gap-3 p-2 bg-base-200 rounded-lg">
+                      <div className="w-8 h-8 rounded-lg bg-base-300 flex items-center justify-center text-xs font-bold">
+                        {scene.sceneNumber || idx + 1}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-xs truncate">{scene.prompt?.slice(0, 50) || 'Scene'}</p>
+                        <p className="text-[10px] text-base-content/50">{scene.duration || 5}s</p>
+                      </div>
+                      <div>
+                        {scene.status === 'processing' && <span className="loading loading-spinner loading-xs text-warning" />}
+                        {scene.status === 'complete' && <div className="badge badge-success badge-xs">Done</div>}
+                        {scene.status === 'failed' && <div className="badge badge-error badge-xs">Failed</div>}
+                      </div>
+                      {scene.videoUrl && (
+                        <a href={scene.videoUrl} target="_blank" rel="noopener noreferrer" className="btn btn-xs btn-ghost">
+                          <Play size={12} />
+                        </a>
+                      )}
+                    </div>
+                  ))}
+                </div>
+                {reelResult.status === 'ready' && (
+                  <div className="mt-3">
+                    <Link
+                      href={latestContentId ? `/dashboard/publish?contentId=${latestContentId}` : '/dashboard/publish'}
+                      className="btn btn-primary btn-sm w-full gap-1"
+                    >
+                      <Send size={14} /> Publish Reel
+                    </Link>
+                  </div>
+                )}
+                {reelResult.error && (
+                  <p className="text-xs text-error mt-2">{reelResult.error}</p>
+                )}
               </div>
             )}
           </div>
@@ -968,7 +1038,7 @@ export default function CreatePage() {
                 <div className="card-body">
                   <div className="flex items-center justify-between mb-3">
                     <h2 className="text-sm font-bold flex items-center gap-1.5"><Eye size={14} /> Preview</h2>
-                    {generated && (
+                    {hasContent && (
                       <div className="flex gap-1">
                         <button onClick={handleCopy} className="btn btn-ghost btn-xs">
                           {copied ? <Check size={12} /> : <Copy size={12} />}
@@ -991,19 +1061,19 @@ export default function CreatePage() {
                     ))}
                   </div>
 
-                  {generated ? (
+                  {hasContent ? (
                     <>
                       <SocialPostPreview
                         platform={previewPlatform}
                         brandName={brandKit?.brandName || 'Your Brand'}
                         handle="@yourbrand"
-                        text={generated?.text || ''}
-                        imageUrl={generated?.url || null}
+                        text={generatedText || ''}
+                        imageUrl={generatedImageUrl || null}
                       />
                       <div className="flex gap-2 mt-4">
                         <Link href="/dashboard/content" className="btn btn-outline btn-sm flex-1">Library</Link>
                         <Link
-                          href={generated?.contentId ? `/dashboard/publish?contentId=${generated.contentId}` : '/dashboard/publish'}
+                          href={latestContentId ? `/dashboard/publish?contentId=${latestContentId}` : '/dashboard/publish'}
                           className="btn btn-primary btn-sm flex-1 gap-1"
                         >
                           <Send size={12} /> Publish

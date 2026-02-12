@@ -3,7 +3,6 @@ import { z } from "zod";
 import { apiError, apiSuccess, withApiAuth } from "@/libs/apiAuth";
 import connectMongo from "@/libs/mongoose";
 import BrandKit from "@/models/BrandKit";
-import Content from "@/models/Content";
 
 const planRequestSchema = z.object({
   prompt: z.string().min(3).max(2000),
@@ -178,44 +177,12 @@ export const POST = withApiAuth(async (request, { userId }) => {
     const fallbackValidated = planResponseSchema.parse(fallback);
     fallbackValidated.scenes = normalizeDurations(fallbackValidated.scenes, parsed.data.durationSeconds);
 
-    const content = await (Content as any).create({
-      userId,
-      type: "reel",
-      status: "draft",
-      title: fallbackValidated.title,
-      aiGeneration: {
-        textPrompt: parsed.data.prompt,
-        videoScenes: fallbackValidated.scenes.map((s) => ({
-          sceneNumber: s.sceneNumber,
-          prompt: s.visualPrompt,
-          duration: s.durationSeconds,
-          status: "planned",
-        })),
-      },
-    });
-
-    return apiSuccess({ contentId: content._id, plan: fallbackValidated, note: "Used fallback planner" });
+    return apiSuccess({ plan: fallbackValidated, note: "Used fallback planner" });
   }
 
   const plan = validated.data;
   plan.scenes = normalizeDurations(plan.scenes, parsed.data.durationSeconds);
 
-  const content = await (Content as any).create({
-    userId,
-    type: "reel",
-    status: "draft",
-    title: plan.title,
-    aiGeneration: {
-      textPrompt: parsed.data.prompt,
-      videoScenes: plan.scenes.map((s) => ({
-        sceneNumber: s.sceneNumber,
-        prompt: s.visualPrompt,
-        duration: s.durationSeconds,
-        status: "planned",
-      })),
-    },
-  });
-
-  return apiSuccess({ contentId: content._id, plan });
+  return apiSuccess({ plan });
 }, "content:write");
 

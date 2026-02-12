@@ -4,11 +4,16 @@ import connectMongo from "@/libs/mongoose";
 import ApiKey from "@/models/ApiKey";
 import { generateApiKey } from "@/libs/encryption";
 
+// DEV BYPASS helper
+const devSession = process.env.NODE_ENV === "development" && process.env.SKIP_AUTH === "1"
+  ? { user: { id: "000000000000000000000001", name: "Dev User", email: "admin@velocitynine-labs.com" } }
+  : null;
+
 // GET /api/v1/keys - List user's API keys
 export async function GET(request: NextRequest) {
   try {
-    const session = await auth();
-    
+    const session = devSession || await auth();
+
     if (!session?.user?.id) {
       return NextResponse.json({ success: false, error: "Unauthorized" }, { status: 401 });
     }
@@ -41,8 +46,8 @@ export async function GET(request: NextRequest) {
 // POST /api/v1/keys - Create a new API key
 export async function POST(request: NextRequest) {
   try {
-    const session = await auth();
-    
+    const session = devSession || await auth();
+
     if (!session?.user?.id) {
       return NextResponse.json({ success: false, error: "Unauthorized" }, { status: 401 });
     }
@@ -104,8 +109,8 @@ export async function POST(request: NextRequest) {
 // DELETE /api/v1/keys - Revoke an API key
 export async function DELETE(request: NextRequest) {
   try {
-    const session = await auth();
-    
+    const session = devSession || await auth();
+
     if (!session?.user?.id) {
       return NextResponse.json({ success: false, error: "Unauthorized" }, { status: 401 });
     }

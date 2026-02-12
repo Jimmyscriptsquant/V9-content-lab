@@ -5,7 +5,7 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
-import { 
+import {
   Send,
   Image as ImageIcon,
   Video,
@@ -16,7 +16,9 @@ import {
   Library,
   Search,
   X,
+  Eye,
 } from 'lucide-react';
+import SocialPostPreview, { type PreviewPlatform } from '@/components/dashboard/SocialPostPreview';
 
 const platforms = [
   { id: 'twitter', name: 'X (Twitter)', icon: '𝕏', maxLength: 280 },
@@ -406,23 +408,23 @@ export default function PublishPage() {
             )}
           </button>
 
-          {/* Preview */}
+          {/* Live Platform Previews */}
           {content && selectedPlatforms.length > 0 && (
-            <div className="card bg-base-100 shadow">
-              <div className="card-body">
-                <h3 className="font-bold text-sm mb-2">Preview</h3>
-                <div className="bg-base-200 rounded-lg p-3">
-                  <p className="text-sm whitespace-pre-wrap">{content}</p>
-                </div>
-                <div className="flex gap-1 mt-2">
-                  {selectedPlatforms.map(p => {
-                    const platform = platforms.find(pl => pl.id === p);
-                    return (
-                      <span key={p} className="badge badge-sm">{platform?.icon}</span>
-                    );
-                  })}
-                </div>
-              </div>
+            <div className="space-y-3">
+              <h3 className="font-bold text-sm flex items-center gap-1.5">
+                <Eye size={14} />
+                Live Preview
+              </h3>
+              {selectedPlatforms.map(p => (
+                <SocialPostPreview
+                  key={p}
+                  platform={p as PreviewPlatform}
+                  brandName="Your Brand"
+                  handle="@yourbrand"
+                  text={content}
+                  imageUrl={selectedMediaUrl}
+                />
+              ))}
             </div>
           )}
         </div>

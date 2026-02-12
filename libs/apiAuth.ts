@@ -120,6 +120,21 @@ export async function authenticateApiRequest(
 export async function authenticateRequest(
   request: NextRequest
 ): Promise<ApiAuthResult> {
+  // DEV BYPASS: skip auth when SKIP_AUTH=1 in development
+  if (process.env.NODE_ENV === "development" && process.env.SKIP_AUTH === "1") {
+    return {
+      success: true,
+      userId: "000000000000000000000001",
+      user: {
+        _id: "000000000000000000000001",
+        name: "Dev User",
+        email: "admin@velocitynine-labs.com",
+      },
+      apiKey: null,
+      authType: "session",
+    };
+  }
+
   const apiKeyValue = getApiKeyFromRequest(request);
   if (apiKeyValue) {
     return authenticateApiRequest(request);

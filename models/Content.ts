@@ -2,7 +2,7 @@ import mongoose from "mongoose";
 import toJSON from "./plugins/toJSON";
 
 export type ContentType = "text" | "image" | "video" | "voice" | "reel" | "carousel";
-export type ContentStatus = "draft" | "ready" | "published" | "failed" | "archived";
+export type ContentStatus = "draft" | "ready" | "processing" | "published" | "failed" | "archived";
 
 const contentSchema = new mongoose.Schema(
   {
@@ -20,7 +20,7 @@ const contentSchema = new mongoose.Schema(
     // Content status
     status: {
       type: String,
-      enum: ["draft", "ready", "published", "failed", "archived"],
+      enum: ["draft", "ready", "processing", "published", "failed", "archived"],
       default: "draft",
     },
     // Title/name for organization
