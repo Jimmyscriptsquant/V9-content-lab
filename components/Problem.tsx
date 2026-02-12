@@ -21,6 +21,7 @@ const Arrow = ({ extraStyle }: { extraStyle: string }) => {
     </svg>
   );
 };
+
 const Step = ({ emoji, text }: { emoji: string; text: string }) => {
   return (
     <div className="w-full md:w-48 flex flex-col gap-2 items-center justify-center">
@@ -30,40 +31,25 @@ const Step = ({ emoji, text }: { emoji: string; text: string }) => {
   );
 };
 
-// Problem Agitation: A crucial, yet overlooked, component for a landing page that sells.
-// It goes under your Hero section, and above your Features section.
-// Your Hero section makes a promise to the customer: "Our product will help you achieve XYZ".
-// Your Problem section explains what happens to the customer if its problem isn't solved.
-// The copy should NEVER mention your product. Instead, it should dig the emotional outcome of not fixing a problem.
-// For instance:
-// - Hero: "Our app helps developers launch startups fast"
-// - Problem Agitation: "Developers spend too much time adding features, get overwhelmed, and quit." (not about your product at all)
-// - Features: "We have user auth, Stripe, emails all set up for you"
-// TODO: Update this component with your own problem/solution copy
 const Problem = () => {
   return (
     <section className="bg-neutral text-neutral-content">
       <div className="max-w-7xl mx-auto px-8 py-16 md:py-32 text-center">
         <h2 className="max-w-3xl mx-auto font-extrabold text-4xl md:text-5xl tracking-tight mb-6 md:mb-8">
-          {/* TODO: Update with your problem statement */}
-          80% of startups fail because founders never launch
+          Content creation is broken. You know it.
         </h2>
         <p className="max-w-xl mx-auto text-lg opacity-90 leading-relaxed mb-12 md:mb-20">
-          {/* TODO: Explain the pain points */}
-          Emails, DNS records, user authentication... There&apos;s so much going
-          on.
+          Juggling 6 different tools, copy-pasting between platforms, resizing
+          images, rewriting captions. You spend more time managing content than
+          actually creating it.
         </p>
 
         <div className="flex flex-col md:flex-row justify-center items-center md:items-start gap-6">
-          <Step emoji="🧑‍💻" text="8 hrs to add Stripe" />
-
+          <Step emoji="😩" text="Write in one tool" />
           <Arrow extraStyle="max-md:-scale-x-100 md:-rotate-90" />
-
-          <Step emoji="😮‍💨" text="Struggle to find time" />
-
+          <Step emoji="🔄" text="Reformat for each platform" />
           <Arrow extraStyle="md:-scale-x-100 md:-rotate-90" />
-
-          <Step emoji="😔" text="Quit project" />
+          <Step emoji="😵" text="Manually post everywhere" />
         </div>
       </div>
     </section>

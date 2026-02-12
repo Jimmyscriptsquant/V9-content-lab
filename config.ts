@@ -5,7 +5,7 @@ const config = {
   appName: "V9 Content Lab",
   // REQUIRED: a short description of your app for SEO tags
   appDescription:
-    "AI-powered content creation and publishing platform. One API key to create images, videos, and posts — then publish everywhere.",
+    "AI-powered content creation and publishing platform. One API to generate text, images, videos, and voiceovers — then publish everywhere. Built for creators, agencies, and AI agents.",
   // REQUIRED (no https://, no trailing slash)
   domainName: "contentlab.velocitynine-labs.com",
   

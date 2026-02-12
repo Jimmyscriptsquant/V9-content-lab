@@ -3,9 +3,6 @@
 import { useRef, useState } from "react";
 import type { JSX } from "react";
 
-// <FAQ> component is a lsit of <Item> component
-// Just import the FAQ & add your FAQ content to the const faqList arrayy below.
-
 interface FAQItemProps {
   question: string;
   answer: JSX.Element;
@@ -13,22 +10,69 @@ interface FAQItemProps {
 
 const faqList: FAQItemProps[] = [
   {
-    question: "What do I get exactly?",
-    answer: <div className="space-y-2 leading-relaxed">Loreum Ipseum</div>,
+    question: "What exactly is V9 Content Lab?",
+    answer: (
+      <div className="space-y-2 leading-relaxed">
+        V9 Content Lab is an AI-powered content creation and publishing platform.
+        You can generate text, images, videos, and voiceovers, then publish directly
+        to Twitter/X, Instagram, Facebook, LinkedIn, and TikTok. Everything is
+        accessible both through a visual dashboard and a REST API.
+      </div>
+    ),
   },
   {
-    question: "Can I get a refund?",
+    question: "What does 'agent-ready' mean? How does it work with AI agents?",
+    answer: (
+      <div className="space-y-2 leading-relaxed">
+        Every feature in V9 Content Lab is exposed via a REST API with API key
+        authentication. This means AI agents (like OpenClaw, AutoGPT, LangChain
+        agents, or your own custom agent) can programmatically create content,
+        plan reel storyboards, and publish to social platforms - completely
+        autonomously. Your agent just needs an API key.
+      </div>
+    ),
+  },
+  {
+    question: "What AI models do you support?",
+    answer: (
+      <div className="space-y-2 leading-relaxed">
+        We support OpenAI (GPT-4o, DALL-E 3, TTS), Anthropic Claude, Kling AI
+        for video generation, and ElevenLabs for voice. We&apos;re also adding support
+        for open-source models via OpenClaw, so you can bring your own models
+        and avoid vendor lock-in.
+      </div>
+    ),
+  },
+  {
+    question: "Can I use my own API keys for AI providers?",
     answer: (
       <p>
-        Yes! You can request a refund within 7 days of your purchase. Reach out
-        by email.
+        Yes. You can bring your own OpenAI, Anthropic, or other provider API keys.
+        This gives you full control over costs and model selection. On the Enterprise
+        plan, you can also configure custom model endpoints.
       </p>
     ),
   },
   {
-    question: "I have another question",
+    question: "Is there a free tier?",
     answer: (
-      <div className="space-y-2 leading-relaxed">Cool, contact us by email</div>
+      <p>
+        Yes. The free tier includes 10 posts per month, 2 connected platforms,
+        and basic AI text generation. No credit card required. Upgrade when you
+        need more.
+      </p>
+    ),
+  },
+  {
+    question: "How is this different from Buffer, Hootsuite, or Later?",
+    answer: (
+      <div className="space-y-2 leading-relaxed">
+        Those tools are scheduling tools - they help you schedule posts you&apos;ve
+        already created. V9 Content Lab creates the content for you using AI
+        (text, images, videos, voiceovers), then publishes it. Plus, everything
+        is API-first, so AI agents can drive the entire workflow autonomously.
+        Traditional tools weren&apos;t built for the agent economy.
+      </div>
     ),
   },
 ];

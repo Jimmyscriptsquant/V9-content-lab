@@ -42,12 +42,22 @@ export const authOptions = {
               password: { label: "Password", type: "password" },
             },
             async authorize(credentials) {
+              console.log("[DEV-LOGIN] authorize called, credentials keys:", Object.keys(credentials || {}));
               const email = String(credentials?.email || "").trim().toLowerCase();
               const password = String(credentials?.password || "");
 
-              if (!email || !password) return null;
-              if (password !== process.env.DEV_LOGIN_PASSWORD) return null;
+              console.log("[DEV-LOGIN] email:", email, "password length:", password.length, "expected:", process.env.DEV_LOGIN_PASSWORD?.length);
 
+              if (!email || !password) {
+                console.log("[DEV-LOGIN] REJECTED: empty email or password");
+                return null;
+              }
+              if (password !== process.env.DEV_LOGIN_PASSWORD) {
+                console.log("[DEV-LOGIN] REJECTED: password mismatch, got:", JSON.stringify(password), "expected:", JSON.stringify(process.env.DEV_LOGIN_PASSWORD));
+                return null;
+              }
+
+              console.log("[DEV-LOGIN] password OK, connecting to MongoDB...");
               // Ensure we have a DB so app features work (content, api keys, etc.)
               await connectMongoose();
 
@@ -57,6 +67,7 @@ export const authOptions = {
                 { new: true, upsert: true }
               );
 
+              console.log("[DEV-LOGIN] SUCCESS, user:", user._id.toString(), user.email);
               return {
                 id: user._id.toString(),
                 email: user.email,
@@ -87,7 +98,11 @@ export const authOptions = {
   // New users will be saved in Database (MongoDB Atlas). Each user (model) has some fields like name, email, image, etc..
   // Requires a MongoDB database. Set MONOGODB_URI env variable.
   // Learn more about the model type: https://next-auth.js.org/v3/adapters/models
-  ...(connectMongo && { adapter: MongoDBAdapter(connectMongo) }),
+  //
+  // IMPORTANT: The MongoDBAdapter conflicts with CredentialsProvider in Auth.js v5.
+  // When DEV_LOGIN_PASSWORD is set we skip the adapter — the credentials authorize()
+  // function creates users via Mongoose directly, so all features still work.
+  ...(connectMongo && !process.env.DEV_LOGIN_PASSWORD && { adapter: MongoDBAdapter(connectMongo) }),
 
   callbacks: {
     session: async ({ session, token }: any) => {
