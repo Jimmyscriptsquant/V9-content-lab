@@ -1,34 +1,7 @@
 import { withApiAuth, apiError, apiSuccess } from "@/libs/apiAuth";
+import { createKlingJWT, isKlingConfigured } from "@/libs/kling";
 import connectMongo from "@/libs/mongoose";
 import Content from "@/models/Content";
-import * as crypto from "crypto";
-
-// Kling AI configuration
-const KLING_API_KEY = process.env.KLING_API_KEY;
-const KLING_API_SECRET = process.env.KLING_API_SECRET;
-
-function createKlingJWT(): string {
-  if (!KLING_API_KEY || !KLING_API_SECRET) {
-    throw new Error("Kling AI is not configured (missing KLING_API_KEY / KLING_API_SECRET)");
-  }
-  const header = { alg: "HS256", typ: "JWT" };
-  const now = Math.floor(Date.now() / 1000);
-  const payload = { iss: KLING_API_KEY, exp: now + 1800, nbf: now - 5 };
-
-  const b64url = (data: object): string => {
-    return Buffer.from(JSON.stringify(data))
-      .toString("base64")
-      .replace(/=/g, "")
-      .replace(/\+/g, "-")
-      .replace(/\//g, "_");
-  };
-
-  const unsigned = `${b64url(header)}.${b64url(payload)}`;
-  const sig = crypto.createHmac("sha256", KLING_API_SECRET).update(unsigned).digest();
-  const sigBase64 = sig.toString("base64").replace(/=/g, "").replace(/\+/g, "-").replace(/\//g, "_");
-
-  return `${unsigned}.${sigBase64}`;
-}
 
 // POST /api/v1/generate - Generate content with AI
 export const POST = withApiAuth(async (request, { userId }) => {
@@ -185,7 +158,7 @@ async function generateImage(prompt: string, options?: any) {
 
 // Video generation with Kling AI
 async function generateVideo(prompt: string, options?: any) {
-  if (!KLING_API_KEY || !KLING_API_SECRET) {
+  if (!isKlingConfigured()) {
     return {
       scenes: [],
       status: "failed",
@@ -303,7 +276,7 @@ export const GET = withApiAuth(async (request, { userId }) => {
   const contentId = searchParams.get("contentId");
 
   if (taskId) {
-    if (!KLING_API_KEY || !KLING_API_SECRET) {
+    if (!isKlingConfigured()) {
       return apiError("Video status is not configured (missing Kling credentials)", 500);
     }
     const jwt = createKlingJWT();

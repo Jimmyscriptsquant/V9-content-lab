@@ -30,6 +30,9 @@ import {
   ImagePlus,
   FileVideo,
   X,
+  RefreshCw,
+  Link2,
+  Loader2,
 } from 'lucide-react';
 import SocialPostPreview, { type PreviewPlatform } from '@/components/dashboard/SocialPostPreview';
 
@@ -118,6 +121,13 @@ export default function CreatePage() {
   const [mediaFiles, setMediaFiles] = useState<UploadedMedia[]>([]);
   const [uploading, setUploading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Per-scene regeneration tracking: { [sceneNumber]: 'idle' | 'submitting' | 'processing' }
+  const [regeneratingScenes, setRegeneratingScenes] = useState<Record<number, string>>({});
+
+  // Join reel state
+  const [joinLoading, setJoinLoading] = useState(false);
+  const [joinedVideoUrl, setJoinedVideoUrl] = useState<string | null>(null);
 
   // Settings panel
   const [settingsTab, setSettingsTab] = useState<'media' | 'voice' | 'brand'>('media');
@@ -297,6 +307,100 @@ export default function CreatePage() {
     } catch { alert('Failed to save brand kit'); }
     finally { setBrandSaving(false); }
   };
+
+  /* ───── Regenerate single scene ───── */
+  const regenerateScene = async (sceneIdx: number) => {
+    const scene = reelPlan?.scenes?.[sceneIdx];
+    if (!scene) return;
+
+    const sceneNum = scene.sceneNumber;
+    setRegeneratingScenes((prev) => ({ ...prev, [sceneNum]: 'submitting' }));
+
+    try {
+      const prompt = [
+        scene.visualPrompt,
+        scene.onScreenText ? `Text: ${scene.onScreenText}` : '',
+        scene.camera ? `Camera: ${scene.camera}` : '',
+      ].filter(Boolean).join('\n');
+
+      const res = await fetch('/api/v1/reels/regenerate-scene', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          prompt,
+          duration: Number(scene.durationSeconds) || 5,
+          aspectRatio: '9:16',
+          model: selectedVideoModel,
+        }),
+      });
+      const data = await res.json();
+
+      if (res.ok && data.success) {
+        // Update the reelResult scene with the new taskId
+        setReelResult((prev: any) => {
+          if (!prev?.scenes) return prev;
+          const newScenes = prev.scenes.map((s: any) =>
+            (s.sceneNumber || 0) === sceneNum
+              ? { ...s, taskId: data.data.taskId, status: 'processing', videoUrl: undefined }
+              : s
+          );
+          return { ...prev, scenes: newScenes, status: 'processing' };
+        });
+        setRegeneratingScenes((prev) => ({ ...prev, [sceneNum]: 'processing' }));
+        // Clear joined video since scenes changed
+        setJoinedVideoUrl(null);
+      } else {
+        alert(data?.error || 'Failed to regenerate scene');
+        setRegeneratingScenes((prev) => ({ ...prev, [sceneNum]: 'idle' }));
+      }
+    } catch {
+      alert('Failed to regenerate scene');
+      setRegeneratingScenes((prev) => ({ ...prev, [sceneNum]: 'idle' }));
+    }
+  };
+
+  /* ───── Join all scenes into one video ───── */
+  const joinReel = async () => {
+    if (!reelResult?.scenes?.length) return;
+
+    const completedScenes = reelResult.scenes.filter(
+      (s: any) => s.status === 'complete' && s.videoUrl
+    );
+    if (completedScenes.length === 0) {
+      alert('No completed scenes to join');
+      return;
+    }
+
+    setJoinLoading(true);
+    try {
+      const res = await fetch('/api/v1/reels/join', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          scenes: completedScenes.map((s: any) => ({
+            videoUrl: s.videoUrl,
+            sceneNumber: s.sceneNumber,
+          })),
+        }),
+      });
+      const data = await res.json();
+      if (res.ok && data.success) {
+        setJoinedVideoUrl(data.data.url);
+      } else {
+        alert(data?.error || 'Failed to join reel');
+      }
+    } catch {
+      alert('Failed to join reel');
+    } finally {
+      setJoinLoading(false);
+    }
+  };
+
+  /* ───── Computed: are all scenes done? ───── */
+  const allScenesDone = reelResult?.scenes?.length > 0 &&
+    reelResult.scenes.every((s: any) => s.status === 'complete' || s.status === 'failed');
+  const allScenesComplete = reelResult?.scenes?.length > 0 &&
+    reelResult.scenes.every((s: any) => s.status === 'complete');
 
   const handleCopy = () => {
     const text = generatedText || generatedImageUrl || reelResult?.text;
@@ -502,150 +606,267 @@ export default function CreatePage() {
 
                   {/* Scene cards */}
                   <div className="grid grid-cols-1 gap-3">
-                    {reelPlan.scenes.map((scene, idx) => (
-                      <div
-                        key={idx}
-                        onClick={() => setActiveSceneIdx(idx)}
-                        className={`card bg-base-100 border-2 transition-all cursor-pointer ${
-                          idx === activeSceneIdx ? 'border-primary shadow-lg' : 'border-base-300 hover:border-primary/30'
-                        }`}
-                      >
-                        <div className="card-body p-3">
-                          <div className="flex gap-3">
-                            {/* Scene number & thumbnail */}
-                            <div className="flex flex-col items-center gap-2 min-w-[80px]">
-                              <div className={`w-10 h-10 rounded-lg flex items-center justify-center text-sm font-bold ${
-                                idx === activeSceneIdx ? 'bg-primary text-primary-content' : 'bg-base-200'
-                              }`}>
-                                {scene.sceneNumber}
-                              </div>
-                              {/* Thumbnail / media slot */}
-                              <div
-                                className="w-20 h-14 rounded-lg border-2 border-dashed border-base-300 bg-base-200 flex items-center justify-center overflow-hidden relative group"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  if (!scene.mediaRef) fileInputRef.current?.click();
-                                }}
-                              >
-                                {scene.mediaRef ? (
-                                  <>
-                                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                                    <img src={scene.mediaRef} alt="" className="w-full h-full object-cover" />
-                                    <button
-                                      className="absolute inset-0 bg-black/50 text-white opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center"
-                                      onClick={(e) => { e.stopPropagation(); updateScene(idx, { mediaRef: undefined }); }}
-                                    >
-                                      <X size={14} />
-                                    </button>
-                                  </>
-                                ) : (
-                                  <ImagePlus size={16} className="text-base-content/30" />
-                                )}
-                              </div>
-                              <div className="badge badge-sm badge-outline">{scene.durationSeconds}s</div>
-                            </div>
+                    {reelPlan.scenes.map((scene, idx) => {
+                      // Find matching result scene (if reel has been generated)
+                      const resultScene = reelResult?.scenes?.find(
+                        (rs: any) => (rs.sceneNumber || 0) === scene.sceneNumber
+                      );
+                      const sceneStatus = resultScene?.status; // 'processing' | 'complete' | 'failed' | undefined
+                      const sceneVideoUrl = resultScene?.videoUrl;
+                      const isRegenerating = regeneratingScenes[scene.sceneNumber] === 'submitting';
 
-                            {/* Scene content */}
-                            <div className="flex-1 space-y-2 min-w-0">
-                              {/* Visual prompt */}
-                              <textarea
-                                className="textarea textarea-bordered w-full text-sm h-16 leading-tight"
-                                placeholder="Visual prompt for this scene..."
-                                value={scene.visualPrompt}
-                                onClick={(e) => e.stopPropagation()}
-                                onChange={(e) => updateScene(idx, { visualPrompt: e.target.value })}
-                              />
-
-                              <div className="grid grid-cols-2 gap-2">
-                                <div>
-                                  <input
-                                    className="input input-bordered input-sm w-full text-xs"
-                                    placeholder="On-screen text"
-                                    value={scene.onScreenText}
-                                    onClick={(e) => e.stopPropagation()}
-                                    onChange={(e) => updateScene(idx, { onScreenText: e.target.value })}
-                                  />
+                      return (
+                        <div
+                          key={idx}
+                          onClick={() => setActiveSceneIdx(idx)}
+                          className={`card bg-base-100 border-2 transition-all cursor-pointer ${
+                            idx === activeSceneIdx ? 'border-primary shadow-lg' : 'border-base-300 hover:border-primary/30'
+                          }`}
+                        >
+                          <div className="card-body p-3">
+                            <div className="flex gap-3">
+                              {/* Scene number & thumbnail / video preview */}
+                              <div className="flex flex-col items-center gap-2 min-w-[120px]">
+                                <div className="flex items-center gap-2 w-full">
+                                  <div className={`w-10 h-10 rounded-lg flex items-center justify-center text-sm font-bold ${
+                                    idx === activeSceneIdx ? 'bg-primary text-primary-content' : 'bg-base-200'
+                                  }`}>
+                                    {scene.sceneNumber}
+                                  </div>
+                                  {/* Status badge */}
+                                  {sceneStatus && (
+                                    <div className={`badge badge-xs ${
+                                      sceneStatus === 'processing' ? 'badge-warning' :
+                                      sceneStatus === 'complete' ? 'badge-success' : 'badge-error'
+                                    }`}>
+                                      {sceneStatus === 'processing' && <span className="loading loading-spinner loading-xs mr-1" />}
+                                      {sceneStatus === 'complete' ? 'Done' : sceneStatus === 'failed' ? 'Failed' : 'Processing'}
+                                    </div>
+                                  )}
                                 </div>
-                                <div>
-                                  <input
-                                    className="input input-bordered input-sm w-full text-xs"
-                                    placeholder="Camera direction"
-                                    value={scene.camera}
-                                    onClick={(e) => e.stopPropagation()}
-                                    onChange={(e) => updateScene(idx, { camera: e.target.value })}
-                                  />
-                                </div>
-                              </div>
 
-                              {/* Narration + voice */}
-                              {voiceoverEnabled && (
-                                <div className="flex gap-2 items-start">
-                                  <div className="flex-1">
-                                    <input
-                                      className="input input-bordered input-sm w-full text-xs"
-                                      placeholder="Narration text for this scene..."
-                                      value={scene.narration}
-                                      onClick={(e) => e.stopPropagation()}
-                                      onChange={(e) => updateScene(idx, { narration: e.target.value })}
+                                {/* Video preview or thumbnail slot */}
+                                {sceneVideoUrl ? (
+                                  <div className="w-28 rounded-lg overflow-hidden border border-base-300 bg-black" onClick={(e) => e.stopPropagation()}>
+                                    <video
+                                      src={sceneVideoUrl}
+                                      controls
+                                      className="w-full aspect-[9/16] object-contain"
+                                      preload="metadata"
                                     />
                                   </div>
-                                  <select
-                                    className="select select-bordered select-sm text-xs w-28"
-                                    value={scene.voice || globalVoice}
-                                    onClick={(e) => e.stopPropagation()}
-                                    onChange={(e) => updateScene(idx, { voice: e.target.value })}
+                                ) : sceneStatus === 'processing' ? (
+                                  <div className="w-28 aspect-[9/16] rounded-lg border-2 border-dashed border-warning/50 bg-base-200 flex flex-col items-center justify-center">
+                                    <span className="loading loading-spinner loading-sm text-warning" />
+                                    <span className="text-[10px] text-base-content/40 mt-1">Generating...</span>
+                                  </div>
+                                ) : (
+                                  <div
+                                    className="w-28 h-16 rounded-lg border-2 border-dashed border-base-300 bg-base-200 flex items-center justify-center overflow-hidden relative group"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      if (!scene.mediaRef) fileInputRef.current?.click();
+                                    }}
                                   >
-                                    {AI_VOICES.map((v) => (
-                                      <option key={v.id} value={v.id}>{v.name}</option>
-                    ))}
-                  </select>
-                                </div>
-                              )}
-                            </div>
+                                    {scene.mediaRef ? (
+                                      <>
+                                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                                        <img src={scene.mediaRef} alt="" className="w-full h-full object-cover" />
+                                        <button
+                                          className="absolute inset-0 bg-black/50 text-white opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center"
+                                          onClick={(e) => { e.stopPropagation(); updateScene(idx, { mediaRef: undefined }); }}
+                                        >
+                                          <X size={14} />
+                                        </button>
+                                      </>
+                                    ) : (
+                                      <ImagePlus size={16} className="text-base-content/30" />
+                                    )}
+                                  </div>
+                                )}
+                                <div className="badge badge-sm badge-outline">{scene.durationSeconds}s</div>
+                              </div>
 
-                            {/* Scene actions */}
-                            <div className="flex flex-col gap-1">
-                              <input
-                                type="number"
-                                min={1}
-                                max={15}
-                                className="input input-bordered input-sm w-16 text-center text-xs"
-                                value={scene.durationSeconds}
-                                onClick={(e) => e.stopPropagation()}
-                                onChange={(e) => updateScene(idx, { durationSeconds: Math.max(1, Math.min(15, Number(e.target.value) || 1)) })}
-                              />
-                              <span className="text-[10px] text-base-content/40 text-center">sec</span>
-                              {reelPlan.scenes.length > 1 && (
-                                <button
-                                  className="btn btn-ghost btn-xs text-error"
-                                  onClick={(e) => { e.stopPropagation(); removeScene(idx); }}
-                                >
-                                  <Trash2 size={12} />
-                                </button>
-                              )}
+                              {/* Scene content */}
+                              <div className="flex-1 space-y-2 min-w-0">
+                                {/* Visual prompt */}
+                                <textarea
+                                  className="textarea textarea-bordered w-full text-sm h-16 leading-tight"
+                                  placeholder="Visual prompt for this scene..."
+                                  value={scene.visualPrompt}
+                                  onClick={(e) => e.stopPropagation()}
+                                  onChange={(e) => updateScene(idx, { visualPrompt: e.target.value })}
+                                />
+
+                                <div className="grid grid-cols-2 gap-2">
+                                  <div>
+                                    <input
+                                      className="input input-bordered input-sm w-full text-xs"
+                                      placeholder="On-screen text"
+                                      value={scene.onScreenText}
+                                      onClick={(e) => e.stopPropagation()}
+                                      onChange={(e) => updateScene(idx, { onScreenText: e.target.value })}
+                                    />
+                                  </div>
+                                  <div>
+                                    <input
+                                      className="input input-bordered input-sm w-full text-xs"
+                                      placeholder="Camera direction"
+                                      value={scene.camera}
+                                      onClick={(e) => e.stopPropagation()}
+                                      onChange={(e) => updateScene(idx, { camera: e.target.value })}
+                                    />
+                                  </div>
+                                </div>
+
+                                {/* Narration + voice */}
+                                {voiceoverEnabled && (
+                                  <div className="flex gap-2 items-start">
+                                    <div className="flex-1">
+                                      <input
+                                        className="input input-bordered input-sm w-full text-xs"
+                                        placeholder="Narration text for this scene..."
+                                        value={scene.narration}
+                                        onClick={(e) => e.stopPropagation()}
+                                        onChange={(e) => updateScene(idx, { narration: e.target.value })}
+                                      />
+                                    </div>
+                                    <select
+                                      className="select select-bordered select-sm text-xs w-28"
+                                      value={scene.voice || globalVoice}
+                                      onClick={(e) => e.stopPropagation()}
+                                      onChange={(e) => updateScene(idx, { voice: e.target.value })}
+                                    >
+                                      {AI_VOICES.map((v) => (
+                                        <option key={v.id} value={v.id}>{v.name}</option>
+                                      ))}
+                                    </select>
+                                  </div>
+                                )}
+
+                                {/* Per-scene regenerate button */}
+                                {reelResult && (
+                                  <div className="flex gap-2 items-center pt-1">
+                                    <button
+                                      className="btn btn-ghost btn-xs gap-1"
+                                      disabled={isRegenerating || sceneStatus === 'processing'}
+                                      onClick={(e) => { e.stopPropagation(); regenerateScene(idx); }}
+                                    >
+                                      {isRegenerating || sceneStatus === 'processing' ? (
+                                        <span className="loading loading-spinner loading-xs" />
+                                      ) : (
+                                        <RefreshCw size={12} />
+                                      )}
+                                      {sceneStatus === 'complete' ? 'Re-generate' : sceneStatus === 'failed' ? 'Retry' : 'Regenerate'}
+                                    </button>
+                                    {sceneVideoUrl && (
+                                      <a
+                                        href={sceneVideoUrl}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="btn btn-ghost btn-xs gap-1"
+                                        onClick={(e) => e.stopPropagation()}
+                                      >
+                                        <Download size={12} /> Download
+                                      </a>
+                                    )}
+                                  </div>
+                                )}
+                              </div>
+
+                              {/* Scene actions */}
+                              <div className="flex flex-col gap-1">
+                                <input
+                                  type="number"
+                                  min={1}
+                                  max={15}
+                                  className="input input-bordered input-sm w-16 text-center text-xs"
+                                  value={scene.durationSeconds}
+                                  onClick={(e) => e.stopPropagation()}
+                                  onChange={(e) => updateScene(idx, { durationSeconds: Math.max(1, Math.min(15, Number(e.target.value) || 1)) })}
+                                />
+                                <span className="text-[10px] text-base-content/40 text-center">sec</span>
+                                {reelPlan.scenes.length > 1 && (
+                                  <button
+                                    className="btn btn-ghost btn-xs text-error"
+                                    onClick={(e) => { e.stopPropagation(); removeScene(idx); }}
+                                  >
+                                    <Trash2 size={12} />
+                                  </button>
+                                )}
+                              </div>
                             </div>
                           </div>
                         </div>
-                      </div>
-                    ))}
+                      );
+                    })}
                   </div>
 
-                  {/* Generate button */}
-                  <div className="flex gap-2 pt-2">
-                    <button
-                      className="btn btn-primary flex-1 gap-2"
-                      onClick={generateReel}
-                      disabled={reelGenerating || reelTotalSeconds <= 0}
-                    >
-                      {reelGenerating ? <span className="loading loading-spinner loading-sm" /> : <Sparkles size={16} />}
-                      {reelGenerating ? 'Generating Reel...' : 'Generate Reel'}
-                    </button>
-                    <button
-                      className="btn btn-outline btn-sm"
-                      onClick={() => { setReelPlan(null); setReelResult(null); }}
-                    >
-                      Reset
-                    </button>
+                  {/* Generate / Join buttons */}
+                  <div className="flex flex-col gap-2 pt-2">
+                    <div className="flex gap-2">
+                      <button
+                        className="btn btn-primary flex-1 gap-2"
+                        onClick={generateReel}
+                        disabled={reelGenerating || reelTotalSeconds <= 0}
+                      >
+                        {reelGenerating ? <span className="loading loading-spinner loading-sm" /> : <Sparkles size={16} />}
+                        {reelGenerating ? 'Generating Reel...' : 'Generate Reel'}
+                      </button>
+                      <button
+                        className="btn btn-outline btn-sm"
+                        onClick={() => { setReelPlan(null); setReelResult(null); setJoinedVideoUrl(null); setRegeneratingScenes({}); }}
+                      >
+                        Reset
+                      </button>
+                    </div>
+
+                    {/* Join Reel button - shown when all scenes are complete */}
+                    {allScenesComplete && (
+                      <button
+                        className="btn btn-secondary w-full gap-2"
+                        onClick={joinReel}
+                        disabled={joinLoading}
+                      >
+                        {joinLoading ? <span className="loading loading-spinner loading-sm" /> : <Link2 size={16} />}
+                        {joinLoading ? 'Joining Scenes...' : 'Join All Scenes into Final Reel'}
+                      </button>
+                    )}
+
+                    {/* Joined video preview */}
+                    {joinedVideoUrl && (
+                      <div className="card bg-base-100 border-2 border-success">
+                        <div className="card-body p-3">
+                          <div className="flex items-center justify-between mb-2">
+                            <h4 className="text-sm font-bold flex items-center gap-1.5">
+                              <Film size={14} className="text-success" /> Final Reel
+                            </h4>
+                            <div className="flex gap-1">
+                              <a
+                                href={joinedVideoUrl}
+                                download
+                                className="btn btn-ghost btn-xs gap-1"
+                              >
+                                <Download size={12} /> Download
+                              </a>
+                              <Link
+                                href={latestContentId ? `/dashboard/publish?contentId=${latestContentId}` : '/dashboard/publish'}
+                                className="btn btn-primary btn-xs gap-1"
+                              >
+                                <Send size={12} /> Publish
+                              </Link>
+                            </div>
+                          </div>
+                          <div className="rounded-lg overflow-hidden bg-black max-w-[240px] mx-auto">
+                            <video
+                              src={joinedVideoUrl}
+                              controls
+                              className="w-full aspect-[9/16] object-contain"
+                            />
+                          </div>
+                        </div>
+                      </div>
+                    )}
                   </div>
                 </div>
               )}
@@ -885,8 +1106,8 @@ export default function CreatePage() {
 
             {/* Reel generation status */}
             {reelResult && (
-              <div className="border-t border-base-300 p-4">
-                <div className="flex items-center justify-between mb-2">
+              <div className="border-t border-base-300 p-4 space-y-3">
+                <div className="flex items-center justify-between">
                   <h3 className="text-sm font-semibold flex items-center gap-1.5"><Eye size={14} /> Reel Status</h3>
                   <div className={`badge badge-sm ${reelResult.status === 'ready' ? 'badge-success' : reelResult.status === 'failed' ? 'badge-error' : 'badge-warning'}`}>
                     {reelResult.status}
@@ -915,18 +1136,47 @@ export default function CreatePage() {
                     </div>
                   ))}
                 </div>
-                {reelResult.status === 'ready' && (
-                  <div className="mt-3">
-                    <Link
-                      href={latestContentId ? `/dashboard/publish?contentId=${latestContentId}` : '/dashboard/publish'}
-                      className="btn btn-primary btn-sm w-full gap-1"
-                    >
-                      <Send size={14} /> Publish Reel
-                    </Link>
+
+                {/* Join button in side panel */}
+                {allScenesComplete && !joinedVideoUrl && (
+                  <button
+                    className="btn btn-secondary btn-sm w-full gap-1"
+                    onClick={joinReel}
+                    disabled={joinLoading}
+                  >
+                    {joinLoading ? <span className="loading loading-spinner loading-xs" /> : <Link2 size={14} />}
+                    {joinLoading ? 'Joining...' : 'Join into Final Reel'}
+                  </button>
+                )}
+
+                {/* Final reel preview in side panel */}
+                {joinedVideoUrl && (
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-semibold flex items-center gap-1 text-success">
+                        <Film size={12} /> Final Reel Ready
+                      </span>
+                      <a href={joinedVideoUrl} download className="btn btn-ghost btn-xs gap-1">
+                        <Download size={10} /> Download
+                      </a>
+                    </div>
+                    <div className="rounded-lg overflow-hidden bg-black">
+                      <video src={joinedVideoUrl} controls className="w-full aspect-[9/16] object-contain" />
+                    </div>
                   </div>
                 )}
+
+                {allScenesDone && (
+                  <Link
+                    href={latestContentId ? `/dashboard/publish?contentId=${latestContentId}` : '/dashboard/publish'}
+                    className="btn btn-primary btn-sm w-full gap-1"
+                  >
+                    <Send size={14} /> Publish Reel
+                  </Link>
+                )}
+
                 {reelResult.error && (
-                  <p className="text-xs text-error mt-2">{reelResult.error}</p>
+                  <p className="text-xs text-error">{reelResult.error}</p>
                 )}
               </div>
             )}
