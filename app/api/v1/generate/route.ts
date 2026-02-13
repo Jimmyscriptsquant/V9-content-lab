@@ -1,5 +1,6 @@
 import { withApiAuth, apiError, apiSuccess } from "@/libs/apiAuth";
 import { createKlingJWT, isKlingConfigured } from "@/libs/kling";
+import { isStorageConfigured, uploadFromUrl, uploadFile, storageKey } from "@/libs/storage";
 import connectMongo from "@/libs/mongoose";
 import Content from "@/models/Content";
 
@@ -35,6 +36,15 @@ export const POST = withApiAuth(async (request, { userId }) => {
 
       case "image":
         generationResult = await generateImage(prompt, options);
+        // Persist DALL-E image to R2 (OpenAI URLs expire after ~1 hour)
+        if (generationResult.url && isStorageConfigured() && !generationResult.url.startsWith("https://placehold")) {
+          try {
+            const imgKey = storageKey(userId, "images", `image_${Date.now()}.png`);
+            generationResult.url = await uploadFromUrl(imgKey, generationResult.url, "image/png");
+          } catch (e) {
+            console.error("R2 image upload failed, keeping original URL:", e);
+          }
+        }
         content.media = [{
           type: "image",
           url: generationResult.url,
@@ -54,7 +64,7 @@ export const POST = withApiAuth(async (request, { userId }) => {
         break;
 
       case "voice":
-        generationResult = await generateVoice(prompt, options);
+        generationResult = await generateVoice(prompt, options, userId);
         content.media = [{
           type: "audio",
           url: generationResult.url,
@@ -231,9 +241,9 @@ interface VoiceGenerationResult {
   error?: string;
 }
 
-async function generateVoice(text: string, options?: any): Promise<VoiceGenerationResult> {
+async function generateVoice(text: string, options?: any, userId?: string): Promise<VoiceGenerationResult> {
   const openaiKey = process.env.OPENAI_API_KEY;
-  
+
   if (!openaiKey) {
     return {
       url: null,
@@ -259,9 +269,20 @@ async function generateVoice(text: string, options?: any): Promise<VoiceGenerati
     return { url: null, status: "failed", error: "TTS generation failed" };
   }
 
-  const buffer = await response.arrayBuffer();
-  const base64 = Buffer.from(buffer).toString("base64");
-  
+  const buf = Buffer.from(await response.arrayBuffer());
+
+  // Persist to R2 if available
+  if (isStorageConfigured() && userId) {
+    try {
+      const key = storageKey(userId, "audio", `voice_${Date.now()}.mp3`);
+      const url = await uploadFile(key, buf, "audio/mpeg");
+      return { url, duration: Math.ceil(text.length / 15), status: "ready" };
+    } catch (e) {
+      console.error("R2 audio upload failed, falling back to base64:", e);
+    }
+  }
+
+  const base64 = buf.toString("base64");
   return {
     url: `data:audio/mp3;base64,${base64}`,
     duration: Math.ceil(text.length / 15),
