@@ -85,38 +85,38 @@ export default async function DashboardPage() {
       </div>
 
       {/* Quick Stats */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        <div className="stat bg-base-100 rounded-xl shadow">
-          <div className="stat-figure text-primary">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+        <div className="stat bg-base-100 rounded-xl shadow p-3 sm:p-4">
+          <div className="stat-figure text-primary hidden sm:block">
             <FileText size={24} />
           </div>
-          <div className="stat-title">Content Created</div>
-          <div className="stat-value text-primary">0</div>
-          <div className="stat-desc">This month</div>
+          <div className="stat-title text-xs sm:text-sm">Content Created</div>
+          <div className="stat-value text-primary text-xl sm:text-2xl lg:text-3xl">0</div>
+          <div className="stat-desc text-xs">This month</div>
         </div>
-        <div className="stat bg-base-100 rounded-xl shadow">
-          <div className="stat-figure text-secondary">
+        <div className="stat bg-base-100 rounded-xl shadow p-3 sm:p-4">
+          <div className="stat-figure text-secondary hidden sm:block">
             <Send size={24} />
           </div>
-          <div className="stat-title">Posts Published</div>
-          <div className="stat-value text-secondary">0</div>
-          <div className="stat-desc">This month</div>
+          <div className="stat-title text-xs sm:text-sm">Published</div>
+          <div className="stat-value text-secondary text-xl sm:text-2xl lg:text-3xl">0</div>
+          <div className="stat-desc text-xs">This month</div>
         </div>
-        <div className="stat bg-base-100 rounded-xl shadow">
-          <div className="stat-figure text-accent">
+        <div className="stat bg-base-100 rounded-xl shadow p-3 sm:p-4">
+          <div className="stat-figure text-accent hidden sm:block">
             <Plug size={24} />
           </div>
-          <div className="stat-title">Connected Accounts</div>
-          <div className="stat-value text-accent">0</div>
-          <div className="stat-desc">Active</div>
+          <div className="stat-title text-xs sm:text-sm">Accounts</div>
+          <div className="stat-value text-accent text-xl sm:text-2xl lg:text-3xl">0</div>
+          <div className="stat-desc text-xs">Connected</div>
         </div>
-        <div className="stat bg-base-100 rounded-xl shadow">
-          <div className="stat-figure text-info">
+        <div className="stat bg-base-100 rounded-xl shadow p-3 sm:p-4">
+          <div className="stat-figure text-info hidden sm:block">
             <Zap size={24} />
           </div>
-          <div className="stat-title">API Requests</div>
-          <div className="stat-value text-info">0</div>
-          <div className="stat-desc">This month</div>
+          <div className="stat-title text-xs sm:text-sm">API Requests</div>
+          <div className="stat-value text-info text-xl sm:text-2xl lg:text-3xl">0</div>
+          <div className="stat-desc text-xs">This month</div>
         </div>
       </div>
 

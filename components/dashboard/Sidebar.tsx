@@ -52,7 +52,7 @@ export default function Sidebar() {
           {!isCollapsed ? (
             <Link href="/dashboard" className="flex items-center gap-2.5">
               <Image
-                src="/logo.svg"
+                src="/logo.png"
                 alt="V9 Content Lab"
                 width={40}
                 height={40}
@@ -67,7 +67,7 @@ export default function Sidebar() {
           ) : (
             <Link href="/dashboard" className="flex justify-center">
               <Image
-                src="/logo.svg"
+                src="/logo.png"
                 alt="V9 Content Lab"
                 width={40}
                 height={40}

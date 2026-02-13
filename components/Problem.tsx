@@ -34,8 +34,8 @@ const Step = ({ emoji, text }: { emoji: string; text: string }) => {
 const Problem = () => {
   return (
     <section className="bg-neutral text-neutral-content">
-      <div className="max-w-7xl mx-auto px-8 py-16 md:py-32 text-center">
-        <h2 className="max-w-3xl mx-auto font-extrabold text-4xl md:text-5xl tracking-tight mb-6 md:mb-8">
+      <div className="max-w-7xl mx-auto px-4 sm:px-8 py-12 sm:py-16 md:py-32 text-center">
+        <h2 className="max-w-3xl mx-auto font-extrabold text-3xl sm:text-4xl md:text-5xl tracking-tight mb-6 md:mb-8">
           Content creation is broken. You know it.
         </h2>
         <p className="max-w-xl mx-auto text-lg opacity-90 leading-relaxed mb-12 md:mb-20">

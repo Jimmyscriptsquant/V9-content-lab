@@ -6,7 +6,6 @@ import { useSearchParams } from "next/navigation";
 import Link from "next/link";
 import Image from "next/image";
 import ButtonSignin from "./ButtonSignin";
-import logo from "@/app/icon.png";
 import config from "@/config";
 
 const links: {
@@ -43,7 +42,7 @@ const Header = () => {
   return (
     <header className="bg-base-200">
       <nav
-        className="container flex items-center justify-between px-8 py-4 mx-auto"
+        className="container flex items-center justify-between px-4 sm:px-8 py-3 sm:py-4 mx-auto"
         aria-label="Global"
       >
         {/* Your logo/name on large screens */}
@@ -54,10 +53,9 @@ const Header = () => {
             title={`${config.appName} homepage`}
           >
             <Image
-              src={logo}
+              src="/logo.png"
               alt={`${config.appName} logo`}
-              className="w-8"
-              placeholder="blur"
+              className="w-8 h-8 rounded-lg"
               priority={true}
               width={32}
               height={32}
@@ -121,10 +119,9 @@ const Header = () => {
               href="/"
             >
               <Image
-                src={logo}
+                src="/logo.png"
                 alt={`${config.appName} logo`}
-                className="w-8"
-                placeholder="blur"
+                className="w-8 h-8 rounded-lg"
                 priority={true}
                 width={32}
                 height={32}

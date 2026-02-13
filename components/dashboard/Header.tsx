@@ -22,7 +22,7 @@ export default function Header() {
         {/* Mobile Logo */}
         <Link href="/dashboard" className="lg:hidden flex items-center gap-2 flex-shrink-0">
           <NextImage
-            src="/logo.svg"
+            src="/logo.png"
             alt="V9 Content Lab"
             width={32}
             height={32}

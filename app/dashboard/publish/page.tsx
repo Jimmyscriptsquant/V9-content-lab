@@ -206,12 +206,12 @@ export default function PublishPage() {
           {/* Content Input */}
           <div className="card bg-base-100 shadow">
             <div className="card-body">
-              <div className="flex items-center justify-between gap-3 mb-4">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 sm:gap-3 mb-4">
                 <h2 className="card-title">Content</h2>
                 <div className="flex items-center gap-2">
                   <button className="btn btn-outline btn-sm" onClick={openPicker} type="button">
                     <Library size={16} />
-                    Choose from Library
+                    <span className="hidden sm:inline">Choose from</span> Library
                   </button>
                   {selectedContentId ? (
                     <span className="badge badge-success badge-outline">

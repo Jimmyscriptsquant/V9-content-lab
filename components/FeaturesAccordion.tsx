@@ -117,14 +117,14 @@ const FeaturesAccordion = () => {
 
   return (
     <section
-      className="py-24 md:py-32 space-y-24 md:space-y-32 max-w-7xl mx-auto bg-base-100"
+      className="py-12 sm:py-24 md:py-32 space-y-12 sm:space-y-24 md:space-y-32 max-w-7xl mx-auto bg-base-100"
       id="features"
     >
-      <div className="px-8">
+      <div className="px-4 sm:px-8">
         <p className="font-semibold text-primary mb-4">How It Works</p>
-        <h2 className="font-extrabold text-4xl lg:text-6xl tracking-tight mb-12 md:mb-24">
-          Everything you need to
-          <span className="bg-neutral text-neutral-content px-2 md:px-4 ml-1 md:ml-1.5 leading-relaxed whitespace-nowrap">
+        <h2 className="font-extrabold text-3xl sm:text-4xl lg:text-6xl tracking-tight mb-8 sm:mb-12 md:mb-24">
+          Everything you need to{" "}
+          <span className="bg-neutral text-neutral-content px-2 md:px-4 leading-relaxed inline-block mt-2 sm:mt-0 sm:inline">
             own your content pipeline
           </span>
         </h2>
