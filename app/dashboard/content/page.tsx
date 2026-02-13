@@ -19,16 +19,35 @@ import {
   Eye,
   X,
   Film,
+  Clock,
+  CheckCircle,
+  XCircle,
+  Play,
 } from 'lucide-react';
+
+interface VideoScene {
+  sceneNumber: number;
+  prompt: string;
+  duration: number;
+  taskId: string;
+  status: string;
+  videoUrl?: string;
+}
 
 interface ContentItem {
   id: string;
   type: 'text' | 'image' | 'video' | 'voice' | 'reel' | 'carousel';
   title?: string;
   text?: string;
-  status: 'draft' | 'ready' | 'published' | 'failed' | 'archived';
+  status: 'draft' | 'ready' | 'published' | 'failed' | 'archived' | 'processing';
   createdAt: string;
   media?: { type: 'image' | 'video' | 'audio'; url: string }[];
+  aiGeneration?: {
+    textPrompt?: string;
+    imagePrompt?: string;
+    videoScenes?: VideoScene[];
+    voiceoverText?: string;
+  };
 }
 
 const typeIcons: Record<string, any> = {
@@ -43,6 +62,7 @@ const typeIcons: Record<string, any> = {
 const statusColors: Record<string, string> = {
   draft: 'badge-ghost',
   ready: 'badge-info',
+  processing: 'badge-warning',
   published: 'badge-success',
   failed: 'badge-error',
   archived: 'badge-neutral',
@@ -87,7 +107,7 @@ export default function ContentPage() {
         { id: '1', type: 'text', title: 'AI Automation Tweet', text: 'AI is revolutionizing how we work. Here are 5 ways to leverage automation in your business today...', status: 'published', createdAt: '2026-02-10' },
         { id: '2', type: 'image', title: 'Product Launch Visual', text: 'Futuristic product showcase', status: 'draft', createdAt: '2026-02-09', media: [{ type: 'image', url: 'https://images.unsplash.com/photo-1485827404703-89b55fcc595e?w=400' }] },
         { id: '3', type: 'text', title: 'LinkedIn Article', text: 'The future of content creation is here. AI-powered tools are changing the game for marketers and creators alike...', status: 'ready', createdAt: '2026-02-08' },
-        { id: '4', type: 'reel', title: 'Product Demo Reel', text: '3-scene product demo', status: 'ready', createdAt: '2026-02-07' },
+        { id: '4', type: 'reel', title: 'Product Demo Reel', status: 'ready', createdAt: '2026-02-07', aiGeneration: { videoScenes: [{ sceneNumber: 1, prompt: 'Product showcase with modern lighting', duration: 5, taskId: 'demo-1', status: 'complete' }, { sceneNumber: 2, prompt: 'Feature highlights animation', duration: 5, taskId: 'demo-2', status: 'complete' }, { sceneNumber: 3, prompt: 'Call to action closing scene', duration: 5, taskId: 'demo-3', status: 'complete' }] } },
       ]);
     } finally {
       setIsLoading(false);
@@ -311,7 +331,17 @@ export default function ContentPage() {
                     </div>
                   </div>
                   <h3 className="font-bold text-sm lg:text-base mt-1 line-clamp-1">{title}</h3>
-                  {preview && <p className="text-xs lg:text-sm text-base-content/60 line-clamp-2">{preview}</p>}
+                  {preview ? (
+                    <p className="text-xs lg:text-sm text-base-content/60 line-clamp-2">{preview}</p>
+                  ) : item.aiGeneration?.videoScenes && item.aiGeneration.videoScenes.length > 0 ? (
+                    <p className="text-xs lg:text-sm text-base-content/60">
+                      {item.aiGeneration.videoScenes.length} scene{item.aiGeneration.videoScenes.length !== 1 ? 's' : ''}
+                      {' '}&middot;{' '}
+                      {item.aiGeneration.videoScenes.filter(s => s.status === 'complete' || s.status === 'succeed' || s.status === 'completed').length} ready
+                    </p>
+                  ) : item.aiGeneration?.textPrompt ? (
+                    <p className="text-xs lg:text-sm text-base-content/60 line-clamp-2">{item.aiGeneration.textPrompt}</p>
+                  ) : null}
                   <div className="text-xs text-base-content/40 mt-1">
                     {new Date(item.createdAt).toLocaleDateString()}
                   </div>
@@ -443,8 +473,61 @@ export default function ContentPage() {
               </div>
             )}
 
+            {/* Reel/Video scenes preview */}
+            {previewItem.aiGeneration?.videoScenes && previewItem.aiGeneration.videoScenes.length > 0 && (
+              <div className="space-y-3 mb-4">
+                <h4 className="text-sm font-semibold text-base-content/70">
+                  Scenes ({previewItem.aiGeneration.videoScenes.length})
+                </h4>
+                {previewItem.aiGeneration.videoScenes.map((scene) => {
+                  const isDone = scene.status === 'complete' || scene.status === 'succeed' || scene.status === 'completed';
+                  const isFailed = scene.status === 'failed';
+                  const isProcessing = !isDone && !isFailed;
+                  return (
+                    <div key={scene.sceneNumber} className="bg-base-200 rounded-xl overflow-hidden">
+                      {scene.videoUrl && isDone ? (
+                        <video src={scene.videoUrl} controls className="w-full max-h-64" />
+                      ) : (
+                        <div className="p-4 flex items-start gap-3">
+                          <div className="flex-shrink-0 mt-0.5">
+                            {isDone && <CheckCircle size={18} className="text-success" />}
+                            {isFailed && <XCircle size={18} className="text-error" />}
+                            {isProcessing && <Clock size={18} className="text-warning animate-pulse" />}
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2 mb-1">
+                              <span className="font-medium text-sm">Scene {scene.sceneNumber}</span>
+                              <span className={`badge badge-xs ${isDone ? 'badge-success' : isFailed ? 'badge-error' : 'badge-warning'}`}>
+                                {isDone ? 'Ready' : isFailed ? 'Failed' : 'Processing'}
+                              </span>
+                              {scene.duration && (
+                                <span className="text-xs text-base-content/50">{scene.duration}s</span>
+                              )}
+                            </div>
+                            <p className="text-xs text-base-content/60 line-clamp-2">{scene.prompt}</p>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+
+            {/* AI generation prompt info */}
+            {!previewItem.text && previewItem.aiGeneration?.textPrompt && (
+              <div className="bg-base-200 rounded-xl p-4 mb-4">
+                <p className="text-xs text-base-content/50 mb-1">AI Prompt</p>
+                <p className="text-sm whitespace-pre-wrap">{previewItem.aiGeneration.textPrompt}</p>
+              </div>
+            )}
+
             {/* No content placeholder */}
-            {!previewItem.text && (!previewItem.media || previewItem.media.length === 0) && (
+            {!previewItem.text
+              && (!previewItem.media || previewItem.media.length === 0)
+              && (!previewItem.aiGeneration?.videoScenes || previewItem.aiGeneration.videoScenes.length === 0)
+              && !previewItem.aiGeneration?.textPrompt
+              && (
               <div className="bg-base-200 rounded-xl p-8 mb-4 flex flex-col items-center text-base-content/40">
                 <FileText size={32} className="mb-2" />
                 <p className="text-sm">No preview content available</p>

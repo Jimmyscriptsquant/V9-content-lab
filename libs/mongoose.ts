@@ -14,12 +14,7 @@ const connectMongo = async () => {
   }
 
   return mongoose
-    .connect(process.env.MONGODB_URI, {
-      // Force IPv4 — fixes DNS SRV timeout on Windows
-      family: 4,
-      serverSelectionTimeoutMS: 15000,
-      connectTimeoutMS: 15000,
-    })
+    .connect(process.env.MONGODB_URI)
     .catch((e) => console.error("Mongoose Client Error: " + e.message));
 };
 

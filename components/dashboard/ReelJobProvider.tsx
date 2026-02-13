@@ -110,6 +110,9 @@ export default function ReelJobProvider({ children }: { children: ReactNode }) {
     const processingJobs = jobs.filter((j) => j.status === "processing");
     if (processingJobs.length === 0) return;
 
+    // Track consecutive failures per scene to detect persistent issues
+    const failCounts = new Map<string, number>();
+
     const interval = setInterval(async () => {
       for (const job of processingJobs) {
         const processingScenes = job.scenes.filter(
@@ -122,10 +125,39 @@ export default function ReelJobProvider({ children }: { children: ReactNode }) {
             const res = await fetch(
               `/api/v1/generate?taskId=${scene.taskId}`
             );
+            if (!res.ok) {
+              const count = (failCounts.get(scene.taskId) || 0) + 1;
+              failCounts.set(scene.taskId, count);
+              if (count === 3) {
+                toast.error(
+                  `Scene ${scene.sceneNumber} status check failing — will keep retrying`,
+                  { duration: 5000, id: `poll-warn-${scene.taskId}` }
+                );
+              }
+              continue;
+            }
+
             const data = await res.json();
             if (!data.success) continue;
 
+            // Reset fail counter on success
+            failCounts.delete(scene.taskId);
+
             const taskStatus = data.data?.status;
+            const pollError = data.data?.error;
+
+            // API returned a temporary error but status is still processing
+            if (pollError && taskStatus === "processing") {
+              const count = (failCounts.get(scene.taskId) || 0) + 1;
+              failCounts.set(scene.taskId, count);
+              if (count === 3) {
+                toast(
+                  `Scene ${scene.sceneNumber}: connection unstable, retrying...`,
+                  { duration: 4000, icon: "⚠️", id: `poll-warn-${scene.taskId}` }
+                );
+              }
+              continue;
+            }
 
             if (taskStatus === "succeed" || taskStatus === "completed") {
               const videoUrl = data.data?.videoUrl;
@@ -194,7 +226,15 @@ export default function ReelJobProvider({ children }: { children: ReactNode }) {
               });
             }
           } catch {
-            // Network error, retry next interval
+            // Network error — track and warn after repeated failures
+            const count = (failCounts.get(scene.taskId) || 0) + 1;
+            failCounts.set(scene.taskId, count);
+            if (count === 3) {
+              toast.error(
+                `Connection issues checking scene ${scene.sceneNumber} — will keep retrying`,
+                { duration: 5000, id: `poll-warn-${scene.taskId}` }
+              );
+            }
           }
         }
       }

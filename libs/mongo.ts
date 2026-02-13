@@ -10,18 +10,12 @@ declare global {
 }
 
 const uri = process.env.MONGODB_URI;
-const options = {
-  // Force IPv4 — fixes DNS SRV timeout on Windows
-  family: 4,
-  serverSelectionTimeoutMS: 15000,
-  connectTimeoutMS: 15000,
-};
 
 let client: MongoClient | undefined;
 let clientPromise: Promise<MongoClient> | undefined;
 
 if (!uri) {
-  console.group("⚠️ MONGODB_URI missing from .env");
+  console.group("MONGODB_URI missing from .env");
   console.error(
     "It's not mandatory but a database is required for Magic Links."
   );
@@ -31,12 +25,12 @@ if (!uri) {
   console.groupEnd();
 } else if (process.env.NODE_ENV === "development") {
   if (!global._mongoClientPromise) {
-    client = new MongoClient(uri, options);
+    client = new MongoClient(uri);
     global._mongoClientPromise = client.connect();
   }
   clientPromise = global._mongoClientPromise;
 } else {
-  client = new MongoClient(uri, options);
+  client = new MongoClient(uri);
   clientPromise = client.connect();
 }
 

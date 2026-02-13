@@ -325,10 +325,29 @@ export const GET = withApiAuth(async (request, { userId }) => {
       return apiError("Video status is not configured (missing Kling credentials)", 500);
     }
     const jwt = createKlingJWT();
-    const response = await fetch(`https://api.klingai.com/v1/videos/text2video/${taskId}`, {
-      headers: { "Authorization": `Bearer ${jwt}` },
-    });
-    const data = await response.json();
+
+    let data: any;
+    try {
+      const response = await fetch(`https://api.klingai.com/v1/videos/text2video/${taskId}`, {
+        headers: { "Authorization": `Bearer ${jwt}` },
+        signal: AbortSignal.timeout(15000),
+      });
+      if (!response.ok) {
+        return apiSuccess({
+          taskId,
+          status: "processing",
+          error: `Kling API returned ${response.status} — retrying`,
+        });
+      }
+      data = await response.json();
+    } catch {
+      // Network timeout / connection reset — tell client to keep polling
+      return apiSuccess({
+        taskId,
+        status: "processing",
+        error: "Temporary network issue — retrying automatically",
+      });
+    }
 
     return apiSuccess({
       taskId,
