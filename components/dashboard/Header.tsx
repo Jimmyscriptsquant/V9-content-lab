@@ -21,7 +21,7 @@ export default function Header() {
       <div className="flex items-center gap-3">
         {/* Mobile Logo */}
         <Link href="/dashboard" className="lg:hidden flex items-center flex-shrink-0">
-          <V9Logo size={36} />
+          <V9Logo variant="compact" width={120} />
         </Link>
 
         {/* Search Bar - grows to fill available space */}

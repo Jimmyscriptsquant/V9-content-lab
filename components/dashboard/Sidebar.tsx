@@ -49,9 +49,15 @@ export default function Sidebar() {
       >
         {/* Logo */}
         <div className="p-4 border-b border-base-300">
-          <Link href="/dashboard" className={`flex ${isCollapsed ? 'justify-center' : 'items-center'}`}>
-            <V9Logo size={isCollapsed ? 36 : 48} className="flex-shrink-0" />
-          </Link>
+          {!isCollapsed ? (
+            <Link href="/dashboard" className="flex items-center">
+              <V9Logo variant="compact" width={150} />
+            </Link>
+          ) : (
+            <Link href="/dashboard" className="flex justify-center">
+              <V9Logo variant="square" width={36} />
+            </Link>
+          )}
         </div>
 
         {/* Navigation */}

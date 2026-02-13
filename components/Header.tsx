@@ -52,7 +52,7 @@ const Header = () => {
             href="/"
             title={`${config.appName} homepage`}
           >
-            <V9Logo size={44} />
+            <V9Logo variant="header" width={180} />
           </Link>
         </div>
         {/* Burger button to open menu on mobile */}
@@ -110,7 +110,7 @@ const Header = () => {
               title={`${config.appName} homepage`}
               href="/"
             >
-              <V9Logo size={44} />
+              <V9Logo variant="header" width={160} />
             </Link>
             <button
               type="button"
