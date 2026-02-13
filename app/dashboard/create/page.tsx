@@ -2,7 +2,8 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
-import { 
+import { useReelJobs, ReelJob } from '@/components/dashboard/ReelJobProvider';
+import {
   FileText, 
   Image as ImageIcon, 
   Video, 
@@ -89,6 +90,7 @@ const textTemplates = [
 /* ───────── Component ───────── */
 
 export default function CreatePage() {
+  const { jobs, activeJob, addJob, updateJob, setActiveJobId } = useReelJobs();
   const [activeType, setActiveType] = useState<ContentType>('reel');
   const [prompt, setPrompt] = useState('');
   const [template, setTemplate] = useState('tweet');
@@ -293,6 +295,26 @@ export default function CreatePage() {
       if (res.ok && data.success) {
         setReelResult({ ...data.data, type: 'reel' });
         if (data.data.contentId) setLatestContentId(data.data.contentId);
+
+        // Push to background job context so polling survives navigation
+        const jobId = data.data.contentId || `reel_${Date.now()}`;
+        const job: ReelJob = {
+          id: jobId,
+          title: reelPlan.title || prompt.slice(0, 50),
+          hook: reelPlan.hook,
+          plan: reelPlan,
+          scenes: (data.data.scenes || []).map((s: any) => ({
+            sceneNumber: s.sceneNumber,
+            taskId: s.taskId,
+            prompt: s.prompt,
+            duration: s.duration,
+            status: s.status || 'processing',
+            videoUrl: s.videoUrl,
+          })),
+          status: 'processing',
+          createdAt: Date.now(),
+        };
+        addJob(job);
       } else { alert(data?.error || 'Reel generation failed'); }
     } catch { alert('Reel generation failed'); }
     finally { setReelGenerating(false); }
@@ -346,6 +368,18 @@ export default function CreatePage() {
           );
           return { ...prev, scenes: newScenes, status: 'processing' };
         });
+        // Sync to background job context
+        if (activeJob) {
+          updateJob(activeJob.id, (j) => ({
+            ...j,
+            status: 'processing',
+            scenes: j.scenes.map((s) =>
+              s.sceneNumber === sceneNum
+                ? { ...s, taskId: data.data.taskId, status: 'processing' as const, videoUrl: undefined as string | undefined }
+                : s
+            ),
+          }));
+        }
         setRegeneratingScenes((prev) => ({ ...prev, [sceneNum]: 'processing' }));
         // Clear joined video since scenes changed
         setJoinedVideoUrl(null);
@@ -418,48 +452,41 @@ export default function CreatePage() {
     }
   }, [activeType, template]);
 
-  /* ───── Poll Kling video tasks ───── */
+  /* ───── Sync reel state from background job context ───── */
   useEffect(() => {
-    if (!reelResult?.scenes?.length) return;
-    const processing = reelResult.scenes.filter((s: any) => s.status === 'processing');
-    if (processing.length === 0) return;
-
-    const interval = setInterval(async () => {
-      let updated = false;
-      const newScenes = reelResult.scenes.map((s: any) => ({ ...s }));
-
-      for (const scene of newScenes) {
-        if (scene.status !== 'processing' || !scene.taskId) continue;
-        try {
-          const res = await fetch(`/api/v1/generate?taskId=${scene.taskId}`);
-          const data = await res.json();
-          if (data.success && data.data) {
-            if (data.data.status === 'succeed') {
-              scene.status = 'complete';
-              scene.videoUrl = data.data.videoUrl;
-              updated = true;
-            } else if (data.data.status === 'failed') {
-              scene.status = 'failed';
-              updated = true;
-            }
-          }
-        } catch (e) {
-          console.error('Poll error:', e);
-        }
+    if (!activeJob) return;
+    // Keep local reelResult in sync with context job (which polls in the background)
+    setReelResult((prev: any) => {
+      const ctxScenes = activeJob.scenes;
+      // Only update if there's an actual change
+      if (prev?.scenes && JSON.stringify(prev.scenes) === JSON.stringify(ctxScenes)) return prev;
+      return {
+        ...prev,
+        scenes: ctxScenes,
+        status: activeJob.status,
+        type: 'reel',
+      };
+    });
+    // Clear regenerating status for scenes that finished
+    activeJob.scenes.forEach((s) => {
+      if (s.status === 'complete' || s.status === 'failed') {
+        setRegeneratingScenes((prev) => {
+          if (prev[s.sceneNumber]) return { ...prev, [s.sceneNumber]: 'idle' };
+          return prev;
+        });
       }
+    });
+  }, [activeJob]);
 
-      if (updated) {
-        const allDone = newScenes.every((s: any) => s.status !== 'processing');
-        setReelResult((prev: any) => ({
-          ...prev,
-          scenes: newScenes,
-          status: allDone ? 'ready' : 'processing',
-        }));
-      }
-    }, 5000);
-
-    return () => clearInterval(interval);
-  }, [reelResult]);
+  /* ───── Restore reel job state when returning to the page ───── */
+  useEffect(() => {
+    if (!activeJob || reelPlan) return;
+    // Restore the plan from the saved job
+    if (activeJob.plan) {
+      setReelPlan(activeJob.plan);
+      setPrompt(activeJob.plan.title || '');
+    }
+  }, [activeJob, reelPlan]);
 
   /* ───────── Render ───────── */
   return (

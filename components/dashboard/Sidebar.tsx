@@ -15,7 +15,9 @@ import {
   Settings,
   ChevronLeft,
   Zap,
+  Film,
 } from 'lucide-react';
+import { useReelJobs } from './ReelJobProvider';
 
 const navItems = [
   { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
@@ -32,6 +34,9 @@ const navItems = [
 export default function Sidebar() {
   const pathname = usePathname();
   const [isCollapsed, setIsCollapsed] = useState(false);
+  const { jobs, setActiveJobId } = useReelJobs();
+  const processingJobs = jobs.filter((j) => j.status === 'processing');
+  const completedJobs = jobs.filter((j) => j.status === 'ready');
 
   return (
     <>
@@ -91,6 +96,61 @@ export default function Sidebar() {
 
         {/* Bottom Section */}
         <div className="p-3 border-t border-base-300">
+          {/* Active Reel Jobs */}
+          {(processingJobs.length > 0 || completedJobs.length > 0) && !isCollapsed && (
+            <div className="mb-3 space-y-1.5">
+              {processingJobs.map((job) => {
+                const done = job.scenes.filter((s) => s.status === 'complete' || s.status === 'failed').length;
+                const total = job.scenes.length;
+                return (
+                  <Link
+                    key={job.id}
+                    href="/dashboard/create"
+                    onClick={() => setActiveJobId(job.id)}
+                    className="flex items-center gap-2 px-3 py-2 bg-warning/10 border border-warning/30 rounded-xl text-xs hover:bg-warning/20 transition-colors"
+                  >
+                    <span className="loading loading-spinner loading-xs text-warning" />
+                    <div className="flex-1 min-w-0">
+                      <p className="font-medium truncate">{job.title}</p>
+                      <p className="text-base-content/50">{done}/{total} scenes</p>
+                    </div>
+                  </Link>
+                );
+              })}
+              {completedJobs.map((job) => (
+                <Link
+                  key={job.id}
+                  href="/dashboard/create"
+                  onClick={() => setActiveJobId(job.id)}
+                  className="flex items-center gap-2 px-3 py-2 bg-success/10 border border-success/30 rounded-xl text-xs hover:bg-success/20 transition-colors"
+                >
+                  <Film size={14} className="text-success flex-shrink-0" />
+                  <div className="flex-1 min-w-0">
+                    <p className="font-medium truncate">{job.title}</p>
+                    <p className="text-success">{job.scenes.length} scenes ready</p>
+                  </div>
+                </Link>
+              ))}
+            </div>
+          )}
+          {/* Collapsed job indicator */}
+          {(processingJobs.length > 0 || completedJobs.length > 0) && isCollapsed && (
+            <Link
+              href="/dashboard/create"
+              className="flex justify-center mb-3 relative"
+              title={`${processingJobs.length} processing, ${completedJobs.length} ready`}
+            >
+              <div className="w-10 h-10 rounded-xl bg-base-200 flex items-center justify-center relative">
+                <Film size={18} className={processingJobs.length > 0 ? 'text-warning' : 'text-success'} />
+                {processingJobs.length > 0 && (
+                  <span className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-warning text-[10px] font-bold flex items-center justify-center text-warning-content">
+                    {processingJobs.length}
+                  </span>
+                )}
+              </div>
+            </Link>
+          )}
+
           {/* Usage Stats */}
           {!isCollapsed && (
             <div className="px-3 py-2 mb-3 bg-base-200 rounded-xl">
