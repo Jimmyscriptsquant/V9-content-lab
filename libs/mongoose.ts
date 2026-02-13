@@ -7,8 +7,19 @@ const connectMongo = async () => {
       "Add the MONGODB_URI environment variable inside .env.local to use mongoose"
     );
   }
+
+  // If already connected, reuse the connection
+  if (mongoose.connection.readyState >= 1) {
+    return mongoose.connection;
+  }
+
   return mongoose
-    .connect(process.env.MONGODB_URI)
+    .connect(process.env.MONGODB_URI, {
+      // Force IPv4 — fixes DNS SRV timeout on Windows
+      family: 4,
+      serverSelectionTimeoutMS: 15000,
+      connectTimeoutMS: 15000,
+    })
     .catch((e) => console.error("Mongoose Client Error: " + e.message));
 };
 

@@ -10,7 +10,12 @@ declare global {
 }
 
 const uri = process.env.MONGODB_URI;
-const options = {};
+const options = {
+  // Force IPv4 — fixes DNS SRV timeout on Windows
+  family: 4,
+  serverSelectionTimeoutMS: 15000,
+  connectTimeoutMS: 15000,
+};
 
 let client: MongoClient | undefined;
 let clientPromise: Promise<MongoClient> | undefined;

@@ -2,9 +2,9 @@
 
 import Link from 'next/link';
 import { useState } from 'react';
-import NextImage from 'next/image';
 import { Search, Plus, Bell, ChevronDown, FileText, Image as ImageIcon, Film, Send } from 'lucide-react';
 import ButtonAccount from '@/components/ButtonAccount';
+import V9Logo from '@/components/Logo';
 
 export default function Header() {
   const [searchQuery, setSearchQuery] = useState('');
@@ -21,14 +21,7 @@ export default function Header() {
       <div className="flex items-center gap-3">
         {/* Mobile Logo */}
         <Link href="/dashboard" className="lg:hidden flex items-center gap-2 flex-shrink-0">
-          <NextImage
-            src="/logo.png"
-            alt="V9 Content Lab"
-            width={32}
-            height={32}
-            className="rounded-lg"
-            priority
-          />
+          <V9Logo size={28} className="text-primary" />
           <span className="font-bold text-sm">Content Lab</span>
         </Link>
 

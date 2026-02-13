@@ -4,8 +4,8 @@ import { useState, useEffect } from "react";
 import type { JSX } from "react";
 import { useSearchParams } from "next/navigation";
 import Link from "next/link";
-import Image from "next/image";
 import ButtonSignin from "./ButtonSignin";
+import V9Logo from "./Logo";
 import config from "@/config";
 
 const links: {
@@ -52,14 +52,7 @@ const Header = () => {
             href="/"
             title={`${config.appName} homepage`}
           >
-            <Image
-              src="/logo.png"
-              alt={`${config.appName} logo`}
-              className="w-8 h-8 rounded-lg"
-              priority={true}
-              width={32}
-              height={32}
-            />
+            <V9Logo size={32} className="text-primary" />
             <span className="font-extrabold text-lg">{config.appName}</span>
           </Link>
         </div>
@@ -118,14 +111,7 @@ const Header = () => {
               title={`${config.appName} homepage`}
               href="/"
             >
-              <Image
-                src="/logo.png"
-                alt={`${config.appName} logo`}
-                className="w-8 h-8 rounded-lg"
-                priority={true}
-                width={32}
-                height={32}
-              />
+              <V9Logo size={32} className="text-primary" />
               <span className="font-extrabold text-lg">{config.appName}</span>
             </Link>
             <button

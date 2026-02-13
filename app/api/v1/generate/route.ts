@@ -182,28 +182,41 @@ async function generateVideo(prompt: string, options?: any) {
     duration: String(typeof s.duration === "number" ? s.duration : (s.duration || "5")),
   }));
   const aspectRatio = options?.aspectRatio || "9:16";
-  
+  const model = options?.model || "kling-v1";
+
   const jwt = createKlingJWT();
   const taskIds: any[] = [];
+  const errors: string[] = [];
 
   for (let i = 0; i < scenes.length; i++) {
     const scene = scenes[i];
-    
-    const response = await fetch("https://api.klingai.com/v1/videos/text2video", {
-      method: "POST",
-      headers: {
-        "Authorization": `Bearer ${jwt}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        prompt: scene.prompt || prompt,
-        duration: scene.duration || "5",
-        aspect_ratio: aspectRatio,
-        model_name: "kling-v1",
-      }),
-    });
 
-    const data = await response.json();
+    let data: any;
+    try {
+      const response = await fetch("https://api.klingai.com/v1/videos/text2video", {
+        method: "POST",
+        headers: {
+          "Authorization": `Bearer ${jwt}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          prompt: scene.prompt || prompt,
+          duration: scene.duration || "5",
+          aspect_ratio: aspectRatio,
+          model_name: model,
+        }),
+      });
+
+      if (!response.ok) {
+        errors.push(`Scene ${i + 1}: HTTP ${response.status} ${response.statusText}`);
+        continue;
+      }
+
+      data = await response.json();
+    } catch (e: any) {
+      errors.push(`Scene ${i + 1}: Network error - ${e.message}`);
+      continue;
+    }
 
     if (data.code === 0 && data.data?.task_id) {
       taskIds.push({
@@ -216,9 +229,11 @@ async function generateVideo(prompt: string, options?: any) {
     } else if (data.code === 1303) {
       return {
         scenes: taskIds,
-        status: "processing",
-        error: "Rate limited - some scenes queued",
+        status: taskIds.length > 0 ? "processing" : "failed",
+        error: "Rate limited by Kling AI - try again in a moment",
       };
+    } else {
+      errors.push(`Scene ${i + 1}: Kling error ${data.code} - ${data.message || "unknown"}`);
     }
 
     if (i < scenes.length - 1) {
@@ -226,10 +241,19 @@ async function generateVideo(prompt: string, options?: any) {
     }
   }
 
+  if (taskIds.length === 0) {
+    return {
+      scenes: [],
+      status: "failed",
+      error: `All scenes failed to submit: ${errors.join("; ")}`,
+    };
+  }
+
   return {
     scenes: taskIds,
     status: "processing",
-    message: `Submitted ${taskIds.length} scene(s) for generation`,
+    message: `Submitted ${taskIds.length}/${scenes.length} scene(s) for generation`,
+    ...(errors.length > 0 ? { warnings: errors } : {}),
   };
 }
 

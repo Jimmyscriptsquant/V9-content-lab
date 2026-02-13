@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useState } from 'react';
-import Image from 'next/image';
+import V9Logo from '@/components/Logo';
 import {
   LayoutDashboard,
   Sparkles,
@@ -51,14 +51,7 @@ export default function Sidebar() {
         <div className="p-4 border-b border-base-300">
           {!isCollapsed ? (
             <Link href="/dashboard" className="flex items-center gap-2.5">
-              <Image
-                src="/logo.png"
-                alt="V9 Content Lab"
-                width={40}
-                height={40}
-                className="rounded-xl flex-shrink-0"
-                priority
-              />
+              <V9Logo size={36} className="text-primary flex-shrink-0" />
               <div>
                 <span className="text-lg font-bold leading-tight block">Content Lab</span>
                 <span className="text-xs text-base-content/60 block">by V9 Labs</span>
@@ -66,14 +59,7 @@ export default function Sidebar() {
             </Link>
           ) : (
             <Link href="/dashboard" className="flex justify-center">
-              <Image
-                src="/logo.png"
-                alt="V9 Content Lab"
-                width={40}
-                height={40}
-                className="rounded-xl"
-                priority
-              />
+              <V9Logo size={36} className="text-primary" />
             </Link>
           )}
         </div>
