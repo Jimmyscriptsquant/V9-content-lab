@@ -492,57 +492,61 @@ export default function CreatePage() {
   return (
     <div className="flex flex-col h-full min-h-[calc(100vh-4rem)]">
       {/* ─── Top bar ─── */}
-      <div className="bg-base-100 border-b border-base-300 px-4 lg:px-6 py-3 flex items-center justify-between gap-4 flex-wrap">
-        <div className="flex items-center gap-3">
-          <div className="bg-primary/10 p-2 rounded-lg">
-            <Sparkles size={20} className="text-primary" />
+      <div className="bg-base-100 border-b border-base-300 px-3 lg:px-6 py-2.5">
+        <div className="flex items-center justify-between gap-3">
+          {/* Title - hidden on mobile to save space */}
+          <div className="hidden sm:flex items-center gap-3 flex-shrink-0">
+            <div className="bg-primary/10 p-2 rounded-lg">
+              <Sparkles size={18} className="text-primary" />
+            </div>
+            <div>
+              <h1 className="text-base font-bold leading-tight">Content Studio</h1>
+              <p className="text-[11px] text-base-content/50">Create &amp; edit AI-powered content</p>
+            </div>
           </div>
-      <div>
-            <h1 className="text-lg font-bold leading-tight">Content Studio</h1>
-            <p className="text-xs text-base-content/50">Create &amp; edit AI-powered content</p>
+
+          {/* Content type tabs */}
+          <div className="flex bg-base-200 rounded-xl p-1 gap-0.5 sm:gap-1">
+            {([
+              { id: 'text', label: 'Text', icon: FileText },
+              { id: 'image', label: 'Image', icon: ImageIcon },
+              { id: 'reel', label: 'Reel', icon: Film },
+            ] as const).map((t) => {
+              const Icon = t.icon;
+              const active = activeType === t.id;
+              return (
+                <button
+                  key={t.id}
+                  onClick={() => setActiveType(t.id)}
+                  className={`flex items-center gap-1.5 px-3 sm:px-4 py-1.5 sm:py-2 rounded-lg text-xs sm:text-sm font-medium transition-all ${
+                    active ? 'bg-primary text-primary-content shadow-sm' : 'hover:bg-base-300 text-base-content/70'
+                  }`}
+                >
+                  <Icon size={14} />
+                  {t.label}
+                </button>
+              );
+            })}
           </div>
-      </div>
 
-        {/* Content type tabs */}
-        <div className="flex bg-base-200 rounded-xl p-1 gap-1">
-          {([
-            { id: 'text', label: 'Text', icon: FileText },
-            { id: 'image', label: 'Image', icon: ImageIcon },
-            { id: 'reel', label: 'Reel Studio', icon: Film },
-          ] as const).map((t) => {
-            const Icon = t.icon;
-            const active = activeType === t.id;
-          return (
-            <button
-                key={t.id}
-                onClick={() => setActiveType(t.id)}
-                className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all ${
-                  active ? 'bg-primary text-primary-content shadow-sm' : 'hover:bg-base-300 text-base-content/70'
-                }`}
-              >
-                <Icon size={16} />
-                {t.label}
-            </button>
-          );
-        })}
-      </div>
-
-        {/* Quick actions */}
-        <div className="flex gap-2">
-          {(hasContent || reelResult) && (
-            <>
-              <button onClick={handleCopy} className="btn btn-ghost btn-sm gap-1">
-                {copied ? <Check size={14} /> : <Copy size={14} />}
-                {copied ? 'Copied' : 'Copy'}
-              </button>
-              <Link
-                href={latestContentId ? `/dashboard/publish?contentId=${latestContentId}` : '/dashboard/publish'}
-                className="btn btn-primary btn-sm gap-1"
-              >
-                <Send size={14} /> Publish
-              </Link>
-            </>
-          )}
+          {/* Quick actions */}
+          <div className="flex gap-1.5 flex-shrink-0">
+            {(hasContent || reelResult) && (
+              <>
+                <button onClick={handleCopy} className="btn btn-ghost btn-sm btn-square sm:btn-wide gap-1">
+                  {copied ? <Check size={14} /> : <Copy size={14} />}
+                  <span className="hidden sm:inline">{copied ? 'Copied' : 'Copy'}</span>
+                </button>
+                <Link
+                  href={latestContentId ? `/dashboard/publish?contentId=${latestContentId}` : '/dashboard/publish'}
+                  className="btn btn-primary btn-sm gap-1"
+                >
+                  <Send size={14} />
+                  <span className="hidden sm:inline">Publish</span>
+                </Link>
+              </>
+            )}
+          </div>
         </div>
       </div>
 
@@ -551,37 +555,45 @@ export default function CreatePage() {
         /* ═══════════════ REEL STUDIO ═══════════════ */
         <div className="flex-1 flex flex-col lg:flex-row overflow-hidden">
           {/* ── Left: Storyboard ── */}
-          <div className="flex-1 flex flex-col overflow-hidden">
+          <div className="flex-1 flex flex-col overflow-hidden min-h-0">
             {/* Prompt bar */}
-            <div className="p-4 bg-base-100 border-b border-base-300">
-              <div className="flex gap-3 items-end">
-                <div className="flex-1">
+            <div className="p-4 lg:p-5 bg-base-100 border-b border-base-300">
+              <div className="space-y-3">
+                {/* Concept textarea */}
+                <div>
                   <label className="label py-1">
                     <span className="label-text text-xs font-semibold uppercase tracking-wide text-base-content/50">Reel Concept</span>
                   </label>
                   <textarea
-                    className="textarea textarea-bordered w-full h-20 text-sm"
+                    className="textarea textarea-bordered w-full h-24 text-sm"
                     placeholder="Describe your reel idea... e.g. 'Show 3 productivity hacks with fast cuts, energetic music vibe, end with CTA'"
                     value={prompt}
                     onChange={(e) => setPrompt(e.target.value)}
                   />
                 </div>
-                <div className="flex flex-col gap-2">
-                  <div className="flex gap-2">
+
+                {/* Settings row: Platform, Duration, Plan button */}
+                <div className="flex flex-wrap items-center gap-2 sm:gap-3">
+                  <div className="flex items-center gap-2">
+                    <label className="text-xs font-medium text-base-content/60 whitespace-nowrap">Platform</label>
                     <select className="select select-bordered select-sm" value={reelPlatform} onChange={(e) => setReelPlatform(e.target.value as any)}>
                       <option value="instagram">Instagram</option>
                       <option value="tiktok">TikTok</option>
                       <option value="youtube_shorts">YT Shorts</option>
                     </select>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <label className="text-xs font-medium text-base-content/60 whitespace-nowrap">Duration</label>
                     <select className="select select-bordered select-sm" value={String(reelDuration)} onChange={(e) => setReelDuration(Number(e.target.value) as any)}>
-                      <option value="15">15s</option>
-                      <option value="30">30s</option>
+                      <option value="15">15 seconds</option>
+                      <option value="30">30 seconds</option>
                     </select>
                   </div>
+                  <div className="flex-1" />
                   <button
                     onClick={planReelStoryboard}
                     disabled={!prompt.trim() || planLoading}
-                    className="btn btn-primary btn-sm gap-1"
+                    className="btn btn-primary btn-sm gap-1.5"
                   >
                     {planLoading ? <span className="loading loading-spinner loading-xs" /> : <Wand2 size={14} />}
                     {planLoading ? 'Planning...' : 'Plan Storyboard'}
@@ -901,7 +913,7 @@ export default function CreatePage() {
           </div>
 
           {/* ── Right: Settings & Media Panel ── */}
-          <div className="w-full lg:w-80 xl:w-96 border-l border-base-300 bg-base-100 flex flex-col overflow-hidden">
+          <div className="w-full lg:w-80 xl:w-96 border-t lg:border-t-0 lg:border-l border-base-300 bg-base-100 flex flex-col overflow-hidden max-h-[50vh] lg:max-h-none">
             {/* Panel tabs */}
             <div className="flex border-b border-base-300">
               {([

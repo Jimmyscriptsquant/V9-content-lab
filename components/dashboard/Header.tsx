@@ -2,7 +2,8 @@
 
 import Link from 'next/link';
 import { useState } from 'react';
-import { Search, Plus, Bell, Zap } from 'lucide-react';
+import NextImage from 'next/image';
+import { Search, Plus, Bell, ChevronDown, FileText, Image as ImageIcon, Film, Send } from 'lucide-react';
 import ButtonAccount from '@/components/ButtonAccount';
 
 export default function Header() {
@@ -16,64 +17,72 @@ export default function Header() {
   };
 
   return (
-    <header className="bg-base-100 border-b border-base-300 px-4 lg:px-6 py-3 sticky top-0 z-40">
-      <div className="flex items-center justify-between gap-4">
+    <header className="bg-base-100 border-b border-base-300 px-3 lg:px-6 py-2.5 sticky top-0 z-40">
+      <div className="flex items-center gap-3">
         {/* Mobile Logo */}
-        <Link href="/dashboard" className="lg:hidden flex items-center gap-2">
-          <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-primary to-secondary flex items-center justify-center">
-            <Zap size={18} className="text-white" />
-          </div>
-          <span className="font-bold">Content Lab</span>
+        <Link href="/dashboard" className="lg:hidden flex items-center gap-2 flex-shrink-0">
+          <NextImage
+            src="/logo.svg"
+            alt="V9 Content Lab"
+            width={32}
+            height={32}
+            className="rounded-lg"
+            priority
+          />
+          <span className="font-bold text-sm">Content Lab</span>
         </Link>
 
-        {/* Search Bar */}
+        {/* Search Bar - grows to fill available space */}
         <form onSubmit={handleSearch} className="hidden md:flex flex-1 max-w-md">
-          <div className="join w-full">
+          <label className="input input-bordered input-sm flex items-center gap-2 w-full">
+            <Search size={16} className="text-base-content/40" />
             <input
               type="text"
               placeholder="Search content..."
-              className="input input-bordered join-item flex-1"
+              className="grow"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
             />
-            <button type="submit" className="btn btn-primary join-item">
-              <Search size={18} />
-            </button>
-          </div>
+          </label>
         </form>
 
-        {/* Right Section */}
-        <div className="flex items-center gap-2">
-          {/* Create Button */}
-          <Link href="/dashboard/create" className="btn btn-primary btn-sm gap-1">
-            <Plus size={18} />
-            <span className="hidden sm:inline">Create</span>
-          </Link>
+        {/* Spacer for desktop */}
+        <div className="flex-1 md:hidden" />
 
-          {/* Quick Actions */}
+        {/* Right Section */}
+        <div className="flex items-center gap-1.5 sm:gap-2 flex-shrink-0">
+          {/* Single Create button with dropdown */}
           <div className="dropdown dropdown-end">
-            <label tabIndex={0} className="btn btn-ghost btn-circle btn-sm">
-              <Plus size={20} />
+            <label tabIndex={0} className="btn btn-primary btn-sm gap-1 px-3">
+              <Plus size={16} />
+              <span className="hidden sm:inline">Create</span>
+              <ChevronDown size={14} className="hidden sm:inline opacity-70" />
             </label>
-            <ul tabIndex={0} className="dropdown-content menu p-2 shadow-lg bg-base-100 rounded-box w-52 border border-base-300">
+            <ul tabIndex={0} className="dropdown-content menu p-2 shadow-lg bg-base-100 rounded-box w-52 border border-base-300 mt-1">
+              <li>
+                <Link href="/dashboard/create">
+                  <Plus size={14} /> New Content
+                </Link>
+              </li>
               <li>
                 <Link href="/dashboard/create?type=text">
-                  <span>📝</span> Generate Text
+                  <FileText size={14} /> Generate Text
                 </Link>
               </li>
               <li>
                 <Link href="/dashboard/create?type=image">
-                  <span>🖼️</span> Generate Image
+                  <ImageIcon size={14} /> Generate Image
                 </Link>
               </li>
               <li>
-                <Link href="/dashboard/create?type=video">
-                  <span>🎬</span> Generate Video
+                <Link href="/dashboard/create?type=reel">
+                  <Film size={14} /> Create Reel
                 </Link>
               </li>
+              <div className="divider my-1" />
               <li>
                 <Link href="/dashboard/publish">
-                  <span>📤</span> Quick Publish
+                  <Send size={14} /> Quick Publish
                 </Link>
               </li>
             </ul>
@@ -82,7 +91,7 @@ export default function Header() {
           {/* Notifications */}
           <button className="btn btn-ghost btn-circle btn-sm">
             <div className="indicator">
-              <Bell size={20} />
+              <Bell size={18} />
               <span className="badge badge-xs badge-primary indicator-item"></span>
             </div>
           </button>
@@ -93,19 +102,17 @@ export default function Header() {
       </div>
 
       {/* Mobile Search */}
-      <form onSubmit={handleSearch} className="md:hidden mt-3">
-        <div className="join w-full">
+      <form onSubmit={handleSearch} className="md:hidden mt-2">
+        <label className="input input-bordered input-sm flex items-center gap-2 w-full">
+          <Search size={14} className="text-base-content/40" />
           <input
             type="text"
             placeholder="Search content..."
-            className="input input-bordered input-sm join-item flex-1"
+            className="grow"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
           />
-          <button type="submit" className="btn btn-primary btn-sm join-item">
-            <Search size={16} />
-          </button>
-        </div>
+        </label>
       </form>
     </header>
   );

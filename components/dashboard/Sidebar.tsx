@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useState } from 'react';
+import Image from 'next/image';
 import {
   LayoutDashboard,
   Sparkles,
@@ -14,8 +15,8 @@ import {
   BarChart3,
   Settings,
   ChevronLeft,
-  Zap,
   Film,
+  MoreHorizontal,
 } from 'lucide-react';
 import { useReelJobs } from './ReelJobProvider';
 
@@ -49,20 +50,30 @@ export default function Sidebar() {
         {/* Logo */}
         <div className="p-4 border-b border-base-300">
           {!isCollapsed ? (
-            <Link href="/dashboard" className="flex items-center gap-2">
-              <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-primary to-secondary flex items-center justify-center">
-                <Zap size={24} className="text-white" />
-              </div>
+            <Link href="/dashboard" className="flex items-center gap-2.5">
+              <Image
+                src="/logo.svg"
+                alt="V9 Content Lab"
+                width={40}
+                height={40}
+                className="rounded-xl flex-shrink-0"
+                priority
+              />
               <div>
-                <span className="text-lg font-bold">Content Lab</span>
+                <span className="text-lg font-bold leading-tight block">Content Lab</span>
                 <span className="text-xs text-base-content/60 block">by V9 Labs</span>
               </div>
             </Link>
           ) : (
             <Link href="/dashboard" className="flex justify-center">
-              <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-primary to-secondary flex items-center justify-center">
-                <Zap size={24} className="text-white" />
-              </div>
+              <Image
+                src="/logo.svg"
+                alt="V9 Content Lab"
+                width={40}
+                height={40}
+                className="rounded-xl"
+                priority
+              />
             </Link>
           )}
         </div>
@@ -174,26 +185,50 @@ export default function Sidebar() {
       </aside>
 
       {/* Mobile Bottom Nav */}
-      <nav className="lg:hidden fixed bottom-0 left-0 right-0 bg-base-100 border-t border-base-300 z-50">
-        <div className="flex justify-around py-2">
-          {navItems.slice(0, 5).map((item) => {
+      <nav className="lg:hidden fixed bottom-0 left-0 right-0 bg-base-100 border-t border-base-300 z-50 safe-area-bottom">
+        <div className="flex justify-around py-1.5 px-1">
+          {navItems.slice(0, 4).map((item) => {
             const Icon = item.icon;
-            const isActive = pathname === item.href || 
+            const isActive = pathname === item.href ||
               (item.href !== '/dashboard' && pathname.startsWith(item.href));
 
             return (
               <Link
                 key={item.href}
                 href={item.href}
-                className={`flex flex-col items-center p-2 rounded-lg transition-colors ${
+                className={`flex flex-col items-center px-2 py-1 rounded-lg transition-colors min-w-0 ${
                   isActive ? 'text-primary' : 'text-base-content/60'
                 }`}
               >
-                <Icon size={20} />
-                <span className="text-xs mt-1">{item.name.split(' ')[0]}</span>
+                <Icon size={18} />
+                <span className="text-[10px] mt-0.5 truncate">{item.name === 'Content Library' ? 'Library' : item.name.split(' ')[0]}</span>
               </Link>
             );
           })}
+          {/* More dropdown for remaining items */}
+          <div className="dropdown dropdown-top dropdown-end">
+            <label tabIndex={0} className={`flex flex-col items-center px-2 py-1 rounded-lg transition-colors cursor-pointer ${
+              navItems.slice(4).some((item) => pathname === item.href || (item.href !== '/dashboard' && pathname.startsWith(item.href)))
+                ? 'text-primary' : 'text-base-content/60'
+            }`}>
+              <MoreHorizontal size={18} />
+              <span className="text-[10px] mt-0.5">More</span>
+            </label>
+            <ul tabIndex={0} className="dropdown-content menu p-2 mb-2 shadow-lg bg-base-100 rounded-box w-48 border border-base-300">
+              {navItems.slice(4).map((item) => {
+                const Icon = item.icon;
+                const isActive = pathname === item.href ||
+                  (item.href !== '/dashboard' && pathname.startsWith(item.href));
+                return (
+                  <li key={item.href}>
+                    <Link href={item.href} className={isActive ? 'active' : ''}>
+                      <Icon size={16} /> {item.name}
+                    </Link>
+                  </li>
+                );
+              })}
+            </ul>
+          </div>
         </div>
       </nav>
     </>
