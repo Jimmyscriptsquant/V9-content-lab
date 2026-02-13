@@ -16,10 +16,7 @@ const Footer = () => {
               aria-current="page"
               className="flex gap-2 justify-center md:justify-start items-center"
             >
-              <V9Logo size={24} className="text-primary" />
-              <strong className="font-extrabold tracking-tight text-base md:text-lg">
-                {config.appName}
-              </strong>
+              <V9Logo size={40} />
             </Link>
 
             <p className="mt-3 text-sm text-base-content/80">

@@ -20,9 +20,8 @@ export default function Header() {
     <header className="bg-base-100 border-b border-base-300 px-3 lg:px-6 py-2.5 sticky top-0 z-40">
       <div className="flex items-center gap-3">
         {/* Mobile Logo */}
-        <Link href="/dashboard" className="lg:hidden flex items-center gap-2 flex-shrink-0">
-          <V9Logo size={28} className="text-primary" />
-          <span className="font-bold text-sm">Content Lab</span>
+        <Link href="/dashboard" className="lg:hidden flex items-center flex-shrink-0">
+          <V9Logo size={36} />
         </Link>
 
         {/* Search Bar - grows to fill available space */}
