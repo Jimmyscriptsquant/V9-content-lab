@@ -78,8 +78,12 @@ export const authOptions = {
         ]
       : []),
 
-    // Email provider (optional; requires MongoDB + Resend)
-    ...(connectMongo && process.env.RESEND_API_KEY
+    // Email provider (optional; requires MongoDB adapter + Resend).
+    // Skip when DEV_LOGIN_PASSWORD is set — Auth.js Email provider needs an
+    // adapter, but Credentials + MongoDBAdapter conflict in Auth.js v5.
+    ...(connectMongo &&
+    process.env.RESEND_API_KEY &&
+    !process.env.DEV_LOGIN_PASSWORD
       ? [
           EmailProvider({
             server: {
